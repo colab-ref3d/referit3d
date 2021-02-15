@@ -8,7 +8,7 @@ import pandas as pd
 import tqdm
 import torch.nn.functional as F
 
-from ..utils.evaluation import AverageMeter
+from ..utils.evaluation import DistAverageMeter as AverageMeter
 
 
 def make_batch_keys(args, extras=None):
@@ -26,7 +26,7 @@ def make_batch_keys(args, extras=None):
     return batch_keys
 
 
-def single_epoch_train(model, data_loader, criteria, optimizer, device, pad_idx, args):
+def single_epoch_train(model, data_loader, criteria, optimizer, device, pad_idx, dist_mgr, args):
     """
     :param model:
     :param data_loader:
@@ -34,26 +34,31 @@ def single_epoch_train(model, data_loader, criteria, optimizer, device, pad_idx,
     :param optimizer:
     :param device:
     :param pad_idx: (int)
+    :param dist_mgr: distributed training manager
+    :type dist_mgr: BaseDistMgr
     :param args:
     :return:
     """
     metrics = dict()  # holding the losses/accuracies
-    total_loss_mtr = AverageMeter()
-    referential_loss_mtr = AverageMeter()
-    obj_loss_mtr = AverageMeter()
-    ref_acc_mtr = AverageMeter()
-    cls_acc_mtr = AverageMeter()
-    txt_acc_mtr = AverageMeter()
+    total_loss_mtr = AverageMeter(dist_mgr)
+    referential_loss_mtr = AverageMeter(dist_mgr)
+    obj_loss_mtr = AverageMeter(dist_mgr)
+    ref_acc_mtr = AverageMeter(dist_mgr)
+    cls_acc_mtr = AverageMeter(dist_mgr)
+    txt_acc_mtr = AverageMeter(dist_mgr)
 
     # Set the model in training mode
     model.train()
     np.random.seed()  # call this to change the sampling of the point-clouds
     batch_keys = make_batch_keys(args)
 
-    for batch in tqdm.tqdm(data_loader):
+    iterator = data_loader
+    if dist_mgr.get_rank() == 0:
+        iterator = tqdm.tqdm(data_loader)
+    for batch in iterator:
         # Move data to gpu
         for k in batch_keys:
-            batch[k] = batch[k].to(device)
+            batch[k] = batch[k].to(device, non_blocking=True)
 
         if args.object_encoder == 'pnet':
             batch['objects'] = batch['objects'].permute(0, 1, 3, 2)
@@ -66,6 +71,7 @@ def single_epoch_train(model, data_loader, criteria, optimizer, device, pad_idx,
         all_losses = compute_losses(batch, res, criteria, args)
         total_loss = all_losses['total_loss']
         total_loss.backward()
+        model.sync_gradients()  # dist training
         optimizer.step()
 
         # Update the loss and accuracy meters
@@ -140,15 +146,15 @@ def compute_losses(batch, res, criterion_dict, args):
 
 
 @torch.no_grad()
-def evaluate_on_dataset(model, data_loader, criteria, device, pad_idx, args, randomize=False):
+def evaluate_on_dataset(model, data_loader, criteria, device, pad_idx, dist_mgr, args, randomize=False):
     # TODO post-deadline, can we replace this func with the train + a 'phase==eval' parameter?
     metrics = dict()  # holding the losses/accuracies
-    total_loss_mtr = AverageMeter()
-    referential_loss_mtr = AverageMeter()
-    obj_loss_mtr = AverageMeter()
-    ref_acc_mtr = AverageMeter()
-    cls_acc_mtr = AverageMeter()
-    txt_acc_mtr = AverageMeter()
+    total_loss_mtr = AverageMeter(dist_mgr)
+    referential_loss_mtr = AverageMeter(dist_mgr)
+    obj_loss_mtr = AverageMeter(dist_mgr)
+    ref_acc_mtr = AverageMeter(dist_mgr)
+    cls_acc_mtr = AverageMeter(dist_mgr)
+    txt_acc_mtr = AverageMeter(dist_mgr)
 
     # Set the model in training mode
     model.eval()
@@ -160,7 +166,11 @@ def evaluate_on_dataset(model, data_loader, criteria, device, pad_idx, args, ran
 
     batch_keys = make_batch_keys(args)
 
-    for batch in tqdm.tqdm(data_loader):
+    iterator = data_loader
+    if dist_mgr.get_rank() == 0:
+        iterator = tqdm.tqdm(data_loader)
+
+    for batch in iterator:
         # Move data to gpu
         for k in batch_keys:
             batch[k] = batch[k].to(device)

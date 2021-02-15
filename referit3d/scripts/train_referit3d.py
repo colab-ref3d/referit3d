@@ -16,6 +16,7 @@ from referit3d.in_out.neural_net_oriented import compute_auxiliary_data, trim_sc
 from referit3d.in_out.pt_datasets.listening_dataset import make_data_loaders
 from referit3d.utils import set_gpu_to_zero_position, create_logger, seed_training_code
 from referit3d.utils.tf_visualizer import Visualizer
+from referit3d.utils.utils import dynamic_import
 from referit3d.models.referit3d_net import instantiate_referit3d_net
 from referit3d.models.referit3d_net_utils import single_epoch_train, evaluate_on_dataset
 from referit3d.models.utils import load_state_dicts, save_state_dicts
@@ -103,6 +104,12 @@ if __name__ == '__main__':
     pad_idx = class_to_idx['pad']
 
     model = instantiate_referit3d_net(args, vocab, n_classes).to(device)
+
+    dist_mgr = dynamic_import(args.dist_mgr)()
+    rank, world_size = dist_mgr.init_dist()
+    print(f'dist rank:{rank}/{world_size}')
+
+    model = dist_mgr.get_dist_module(model)
     optimizer = optim.Adam(model.parameters(), lr=args.init_lr)
     lr_scheduler = torch.optim.lr_scheduler.ReduceLROnPlateau(optimizer, mode='max', factor=0.65,
                                                               patience=5, verbose=True)
@@ -113,6 +120,7 @@ if __name__ == '__main__':
     no_improvement = 0
 
     if args.resume_path:
+        model = model.module
         warnings.warn('Resuming assumes that the BEST per-val model is loaded!')
         # perhaps best_test_acc, best_test_epoch, best_test_epoch =  unpickle...
         loaded_epoch = load_state_dicts(args.resume_path, map_location=device, model=model)
@@ -137,11 +145,12 @@ if __name__ == '__main__':
             # if you fine-tune the previous epochs/accuracy are irrelevant.
             dummy = args.max_train_epochs + 1 - start_training_epoch
             print('Ready to *fine-tune* the model for a max of {} epochs'.format(dummy))
+        model = dist_mgr.get_dist_module(model)
 
     # Training.
     if args.mode == 'train':
         train_vis = Visualizer(args.tensorboard_dir)
-        logger = create_logger(args.log_dir)
+        logger = create_logger(args.log_dir, is_rank0=dist_mgr.get_rank() == 0)
         logger.info('Starting the training. Good luck!')
 
         with tqdm.trange(start_training_epoch, args.max_train_epochs + 1, desc='epochs') as bar:
@@ -150,13 +159,14 @@ if __name__ == '__main__':
                 # Train:
                 tic = time.time()
                 train_meters = single_epoch_train(model, data_loaders['train'], criteria, optimizer,
-                                                  device, pad_idx, args=args)
+                                                  device, pad_idx, dist_mgr, args=args)
                 toc = time.time()
                 timings['train'] = (toc - tic) / 60
 
                 # Evaluate:
                 tic = time.time()
-                test_meters = evaluate_on_dataset(model, data_loaders['test'], criteria, device, pad_idx, args=args)
+                test_meters = evaluate_on_dataset(model, data_loaders['test'], criteria, device, pad_idx, dist_mgr,
+                                                  args=args)
                 toc = time.time()
                 timings['test'] = (toc - tic) / 60
 

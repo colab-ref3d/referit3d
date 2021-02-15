@@ -2,6 +2,7 @@ import warnings
 import numpy as np
 import multiprocessing as mp
 from torch.utils.data import DataLoader
+from torch.utils.data.distributed import DistributedSampler
 
 
 def max_io_workers():
@@ -11,7 +12,7 @@ def max_io_workers():
     return n
 
 
-def dataset_to_dataloader(dataset, split, batch_size, n_workers, pin_memory=True, seed=None):
+def dataset_to_dataloader(dataset, split, batch_size, n_workers, dist_mgr, pin_memory=True, seed=None):
     """
     :param dataset:
     :param split:
@@ -23,6 +24,11 @@ def dataset_to_dataloader(dataset, split, batch_size, n_workers, pin_memory=True
     """
     batch_size_multiplier = 1 if split == 'train' else 2
     b_size = int(batch_size_multiplier * batch_size)
+
+    rank = dist_mgr.get_rank()
+    world_size = dist_mgr.get_world_size()
+    assert b_size % world_size == 0
+    b_size //= world_size  # data parallel
 
     drop_last = False
     if split == 'train' and len(dataset) % b_size == 1:
@@ -39,7 +45,8 @@ def dataset_to_dataloader(dataset, split, batch_size, n_workers, pin_memory=True
     data_loader = DataLoader(dataset,
                              batch_size=b_size,
                              num_workers=n_workers,
-                             shuffle=shuffle,
+                             shuffle=False,  # get shuffled in DistributedSampler
+                             sampler=DistributedSampler(dataset, world_size, rank, shuffle=shuffle),
                              drop_last=drop_last,
                              pin_memory=pin_memory,
                              worker_init_fn=worker_init_fn)

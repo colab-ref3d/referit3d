@@ -1,3 +1,5 @@
+import importlib
+
 import numpy as np
 import six
 import string
@@ -164,18 +166,32 @@ def set_gpu_to_zero_position(real_gpu_loc):
     os.environ["CUDA_VISIBLE_DEVICES"] = str(real_gpu_loc)
 
 
-def create_logger(log_dir, std_out=True):
+def create_logger(log_dir, std_out=True, is_rank0=True):
     logger = logging.getLogger()
-    logger.setLevel(logging.INFO)
-    formatter = logging.Formatter('%(asctime)s - %(message)s')
+    if is_rank0:
+        logger.setLevel(logging.INFO)
+        formatter = logging.Formatter('%(asctime)s - %(message)s')
 
-    # Add logging to file handler
-    file_handler = logging.FileHandler(osp.join(log_dir, 'log.txt'))
-    file_handler.setLevel(logging.INFO)
-    file_handler.setFormatter(formatter)
-    logger.addHandler(file_handler)
+        # Add logging to file handler
+        file_handler = logging.FileHandler(osp.join(log_dir, 'log.txt'))
+        file_handler.setLevel(logging.INFO)
+        file_handler.setFormatter(formatter)
+        logger.addHandler(file_handler)
 
-    # Add stdout to also print statements there
-    if std_out:
-        logger.addHandler(logging.StreamHandler(sys.stdout))
+        # Add stdout to also print statements there
+        if std_out:
+            logger.addHandler(logging.StreamHandler(sys.stdout))
+    else:
+        logger.setLevel(logging.ERROR)
     return logger
+
+
+def dynamic_import(module_path):
+    module_spl = module_path.split('.')
+    package, cls_name = '.'.join(module_spl[:-1]), module_spl[-1]
+    try:
+        module = importlib.import_module(package).__dict__[cls_name]
+    except Exception:
+        raise ValueError('unexpected network: ' + module_path)
+
+    return module
