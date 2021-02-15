@@ -11,7 +11,7 @@ def max_io_workers():
     return n
 
 
-def dataset_to_dataloader(dataset, split, batch_size, n_workers, pin_memory=False, seed=None):
+def dataset_to_dataloader(dataset, split, batch_size, n_workers, pin_memory=True, seed=None):
     """
     :param dataset:
     :param split:
