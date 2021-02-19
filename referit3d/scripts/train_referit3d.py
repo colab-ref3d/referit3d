@@ -61,7 +61,6 @@ if __name__ == '__main__':
     # Prepare data & compute auxiliary meta-information.
     all_scans_in_dict = trim_scans_per_referit3d_data(referit_data, all_scans_in_dict)
     mean_rgb, vocab = compute_auxiliary_data(referit_data, all_scans_in_dict, args)
-    data_loaders = make_data_loaders(args, referit_data, vocab, class_to_idx, all_scans_in_dict, mean_rgb)
 
     # Prepare GPU environment
     set_gpu_to_zero_position(args.gpu)  # Pnet++ seems to work only at "gpu:0"
@@ -108,6 +107,8 @@ if __name__ == '__main__':
     dist_mgr = dynamic_import(args.dist_mgr)()
     rank, world_size = dist_mgr.init_dist()
     print(f'dist rank:{rank}/{world_size}')
+
+    data_loaders = make_data_loaders(dist_mgr, args, referit_data, vocab, class_to_idx, all_scans_in_dict, mean_rgb)
 
     model = dist_mgr.get_dist_module(model)
     optimizer = optim.Adam(model.parameters(), lr=args.init_lr)

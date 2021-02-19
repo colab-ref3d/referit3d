@@ -113,7 +113,7 @@ class ListeningDataset(Dataset):
         return res
 
 
-def make_data_loaders(args, referit_data, vocab, class_to_idx, scans, mean_rgb):
+def make_data_loaders(dist_mgr, args, referit_data, vocab, class_to_idx, scans, mean_rgb):
     n_workers = args.n_workers
     if n_workers == -1:
         n_workers = max_io_workers()
@@ -162,6 +162,6 @@ def make_data_loaders(args, referit_data, vocab, class_to_idx, scans, mean_rgb):
         if split == 'test':
             seed = args.random_seed
 
-        data_loaders[split] = dataset_to_dataloader(dataset, split, args.batch_size, n_workers, seed=seed)
+        data_loaders[split] = dataset_to_dataloader(dataset, split, args.batch_size, n_workers, dist_mgr, seed=seed)
 
     return data_loaders
