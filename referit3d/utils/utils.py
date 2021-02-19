@@ -15,6 +15,13 @@ import os.path as osp
 from six.moves import cPickle
 from six.moves import range
 
+DIST_RANK = 0
+
+
+def set_rank(rank):
+    global DIST_RANK
+    DIST_RANK = rank
+
 
 def invert_dictionary(d):
     inv_map = {v: k for k, v in six.iteritems(d)}
@@ -127,6 +134,8 @@ def create_dir(dir_path):
     """
     Creates a directory (or nested directories) if they don't exist.
     """
+    if DIST_RANK != 0:
+        return  # concurrent safety
     if not osp.exists(dir_path):
         os.makedirs(dir_path)
 

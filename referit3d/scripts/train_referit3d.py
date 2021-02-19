@@ -16,7 +16,7 @@ from referit3d.in_out.neural_net_oriented import compute_auxiliary_data, trim_sc
 from referit3d.in_out.pt_datasets.listening_dataset import make_data_loaders
 from referit3d.utils import set_gpu_to_zero_position, create_logger, seed_training_code
 from referit3d.utils.tf_visualizer import Visualizer
-from referit3d.utils.utils import dynamic_import
+from referit3d.utils.utils import dynamic_import, set_rank
 from referit3d.models.referit3d_net import instantiate_referit3d_net
 from referit3d.models.referit3d_net_utils import single_epoch_train, evaluate_on_dataset
 from referit3d.models.utils import load_state_dicts, save_state_dicts
@@ -106,6 +106,7 @@ if __name__ == '__main__':
 
     dist_mgr = dynamic_import(args.dist_mgr)()
     rank, world_size = dist_mgr.init_dist()
+    set_rank(rank)
     print(f'dist rank:{rank}/{world_size}')
 
     data_loaders = make_data_loaders(dist_mgr, args, referit_data, vocab, class_to_idx, all_scans_in_dict, mean_rgb)
