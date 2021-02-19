@@ -61,3 +61,6 @@ class DistModuleImpl(torch.nn.Module):
 
     def sync_gradients(self):
         pass
+
+    def forward(self, *inputs, **kwargs):
+        return self.module(*inputs, **kwargs)
