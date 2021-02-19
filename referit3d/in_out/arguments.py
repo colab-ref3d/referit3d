@@ -121,6 +121,7 @@ def parse_arguments(notebook_options=None):
 
     if not args.resume_path and not args.log_dir:
         raise ValueError
+    return args
 
 
 def prepare_log_files(args):
