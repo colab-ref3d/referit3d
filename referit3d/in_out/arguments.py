@@ -122,6 +122,8 @@ def parse_arguments(notebook_options=None):
     if not args.resume_path and not args.log_dir:
         raise ValueError
 
+
+def prepare_log_files(args):
     if args.config_file is not None:
         with open(args.config_file, 'r') as fin:
             configs_dict = json.load(fin)

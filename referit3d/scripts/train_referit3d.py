@@ -10,7 +10,7 @@ import torch.nn as nn
 from torch import optim
 from termcolor import colored
 
-from referit3d.in_out.arguments import parse_arguments
+from referit3d.in_out.arguments import parse_arguments, prepare_log_files
 from referit3d.in_out.neural_net_oriented import load_scan_related_data, load_referential_data
 from referit3d.in_out.neural_net_oriented import compute_auxiliary_data, trim_scans_per_referit3d_data
 from referit3d.in_out.pt_datasets.listening_dataset import make_data_loaders
@@ -110,6 +110,8 @@ if __name__ == '__main__':
     print(f'dist rank:{rank}/{world_size}')
 
     data_loaders = make_data_loaders(dist_mgr, args, referit_data, vocab, class_to_idx, all_scans_in_dict, mean_rgb)
+    if rank == 0:
+        prepare_log_files(args)
 
     model = dist_mgr.get_dist_module(model)
     optimizer = optim.Adam(model.parameters(), lr=args.init_lr)
@@ -151,66 +153,74 @@ if __name__ == '__main__':
 
     # Training.
     if args.mode == 'train':
-        train_vis = Visualizer(args.tensorboard_dir)
+        if rank == 0:
+            train_vis = Visualizer(args.tensorboard_dir)
+        else:
+            train_vis = None
         logger = create_logger(args.log_dir, is_rank0=dist_mgr.get_rank() == 0)
         logger.info('Starting the training. Good luck!')
 
-        with tqdm.trange(start_training_epoch, args.max_train_epochs + 1, desc='epochs') as bar:
-            timings = dict()
-            for epoch in bar:
-                # Train:
-                tic = time.time()
-                train_meters = single_epoch_train(model, data_loaders['train'], criteria, optimizer,
-                                                  device, pad_idx, dist_mgr, args=args)
-                toc = time.time()
-                timings['train'] = (toc - tic) / 60
+        bar = range(start_training_epoch, args.max_train_epochs + 1)
+        if rank == 0:
+            bar = tqdm.tqdm(bar, desc='epc')
 
-                # Evaluate:
-                tic = time.time()
-                test_meters = evaluate_on_dataset(model, data_loaders['test'], criteria, device, pad_idx, dist_mgr,
-                                                  args=args)
-                toc = time.time()
-                timings['test'] = (toc - tic) / 60
+        timings = dict()
+        for epoch in bar:
+            # Train:
+            tic = time.time()
+            train_meters = single_epoch_train(model, data_loaders['train'], criteria, optimizer,
+                                              device, pad_idx, dist_mgr, args=args)
+            toc = time.time()
+            timings['train'] = (toc - tic) / 60
 
-                eval_acc = test_meters['test_referential_acc']
-                lr_scheduler.step(eval_acc)
+            # Evaluate:
+            tic = time.time()
+            test_meters = evaluate_on_dataset(model, data_loaders['test'], criteria, device, pad_idx, dist_mgr,
+                                              args=args)
+            toc = time.time()
+            timings['test'] = (toc - tic) / 60
 
-                if best_test_acc < eval_acc:
-                    logger.info(colored('Test accuracy, improved @epoch {}'.format(epoch), 'green'))
-                    best_test_acc = eval_acc
-                    best_test_epoch = epoch
+            eval_acc = test_meters['test_referential_acc']
+            lr_scheduler.step(eval_acc)
 
-                    # Save the model (overwrite the best one)
-                    save_state_dicts(osp.join(args.checkpoint_dir, 'best_model.pth'),
-                                     epoch, model=model, optimizer=optimizer, lr_scheduler=lr_scheduler)
-                    no_improvement = 0
-                else:
-                    no_improvement += 1
-                    logger.info(colored('Test accuracy, did not improve @epoch {}'.format(epoch), 'red'))
+            if best_test_acc < eval_acc:
+                logger.info(colored('Test accuracy, improved @epoch {}'.format(epoch), 'green'))
+                best_test_acc = eval_acc
+                best_test_epoch = epoch
 
+                # Save the model (overwrite the best one)
+                save_state_dicts(osp.join(args.checkpoint_dir, 'best_model.pth'),
+                                 epoch, model=model, optimizer=optimizer, lr_scheduler=lr_scheduler)
+                no_improvement = 0
+            else:
+                no_improvement += 1
+                logger.info(colored('Test accuracy, did not improve @epoch {}'.format(epoch), 'red'))
+
+            train_meters.update(test_meters)
+            if rank == 0:
                 log_train_test_information()
-                train_meters.update(test_meters)
                 train_vis.log_scalars({k: v for k, v in train_meters.items() if '_acc' in k}, step=epoch,
-                                      main_tag='acc')
+                                  main_tag='acc')
                 train_vis.log_scalars({k: v for k, v in train_meters.items() if '_loss' in k},
-                                      step=epoch, main_tag='loss')
+                                  step=epoch, main_tag='loss')
 
                 bar.refresh()
 
-                if no_improvement == args.patience:
-                    logger.warning(colored('Stopping the training @epoch-{} due to lack of progress in test-accuracy '
-                                           'boost (patience hit {} epochs)'.format(epoch, args.patience),
-                                           'red', attrs=['bold', 'underline']))
-                    break
+            if no_improvement == args.patience:
+                logger.warning(colored('Stopping the training @epoch-{} due to lack of progress in test-accuracy '
+                                       'boost (patience hit {} epochs)'.format(epoch, args.patience),
+                                       'red', attrs=['bold', 'underline']))
+                break
 
-        with open(osp.join(args.checkpoint_dir, 'final_result.txt'), 'w') as f_out:
-            msg = ('Best accuracy: {:.4f} (@epoch {})'.format(best_test_acc, best_test_epoch))
-            f_out.write(msg)
+        if rank == 0:
+            with open(osp.join(args.checkpoint_dir, 'final_result.txt'), 'w') as f_out:
+                msg = ('Best accuracy: {:.4f} (@epoch {})'.format(best_test_acc, best_test_epoch))
+                f_out.write(msg)
 
-        logger.info('Finished training successfully. Good job!')
+            logger.info('Finished training successfully. Good job!')
 
     elif args.mode == 'evaluate':
-
+        assert rank == 0, 'only support 1 client eval'
         meters = evaluate_on_dataset(model, data_loaders['test'], criteria, device, pad_idx, args=args)
         print('Reference-Accuracy: {:.4f}'.format(meters['test_referential_acc']))
         print('Object-Clf-Accuracy: {:.4f}'.format(meters['test_object_cls_acc']))
