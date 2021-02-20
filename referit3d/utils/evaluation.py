@@ -2,7 +2,7 @@ import numpy as np
 import torch
 
 
-class AverageMeter(object):
+class _AverageMeter(object):
     """Computes and stores the average and current value"""
 
     def __init__(self):
@@ -23,3 +23,21 @@ class AverageMeter(object):
         self.sum += val * n
         self.count += n
         self.avg = self.sum / self.count
+
+
+class DistAverageMeter(_AverageMeter):
+    def __init__(self, dist_mgr):
+        super().__init__()
+        self.dist_mgr = dist_mgr
+
+    def update(self, val, n=1):
+        is_tensor = True
+        dist_mgr = self.dist_mgr
+        if not isinstance(val, torch.Tensor):
+            val = torch.tensor(val)
+            is_tensor = False
+        dist_mgr.allreduce_sum(val)
+        val = val / dist_mgr.get_world_size()
+        if not is_tensor:
+            val = val.item()
+        return super().update(val, n)

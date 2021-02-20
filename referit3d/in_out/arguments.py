@@ -91,6 +91,8 @@ def parse_arguments(notebook_options=None):
     #
     parser.add_argument('--gpu', type=str, default='0', help='specify gpu device. [default: 0]')
     parser.add_argument('--n-gpus', type=int, default=1, help='number gpu devices. [default: 1]')
+    parser.add_argument('--dist-mgr', type=str, help='distributed training manager module path',
+                        default='referit3d.models.dist_mgr.local.LocalDistMgr')
     parser.add_argument('--batch-size', type=int, default=32, help='batch size per gpu. [default: 32]')
     parser.add_argument('--save-args', type=str2bool, default=True, help='save arguments in a json.txt')
     parser.add_argument('--experiment-tag', type=str, default=None, help='will be used to name a subdir '
@@ -119,7 +121,10 @@ def parse_arguments(notebook_options=None):
 
     if not args.resume_path and not args.log_dir:
         raise ValueError
+    return args
 
+
+def prepare_log_files(args):
     if args.config_file is not None:
         with open(args.config_file, 'r') as fin:
             configs_dict = json.load(fin)
