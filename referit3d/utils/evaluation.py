@@ -32,10 +32,12 @@ class DistAverageMeter(_AverageMeter):
 
     def update(self, val, n=1):
         is_tensor = True
+        dist_mgr = self.dist_mgr
         if not isinstance(val, torch.Tensor):
             val = torch.tensor(val)
             is_tensor = False
-        self.dist_mgr.allreduce_mean(val)
+        dist_mgr.allreduce_sum(val)
+        val = val / dist_mgr.get_world_size
         if not is_tensor:
             val = val.item()
         return super().update(val, n)

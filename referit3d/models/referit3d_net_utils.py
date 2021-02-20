@@ -70,7 +70,8 @@ def single_epoch_train(model, data_loader, criteria, optimizer, device, pad_idx,
         optimizer.zero_grad()
         all_losses = compute_losses(batch, res, criteria, args)
         total_loss = all_losses['total_loss']
-        total_loss.backward()
+        avg_loss = total_loss / dist_mgr.get_world_size()
+        avg_loss.backward()
         model.sync_gradients()  # dist training
         optimizer.step()
 

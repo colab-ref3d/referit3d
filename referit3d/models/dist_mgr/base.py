@@ -26,8 +26,8 @@ class BaseDistMgr:
                                              module.affine,
                                              module.track_running_stats)
             if module.affine:
-                module_output.weight.data = module.weight.data.clone(memory_format=torch.preserve_format).detach()
-                module_output.bias.data = module.bias.data.clone(memory_format=torch.preserve_format).detach()
+                module_output.weight.data = module.weight.data.clone().detach()
+                module_output.bias.data = module.bias.data.clone().detach()
                 # keep requires_grad unchanged
                 module_output.weight.requires_grad = module.weight.requires_grad
                 module_output.bias.requires_grad = module.bias.requires_grad
@@ -47,7 +47,7 @@ class BaseDistMgr:
         dist = self.dist_model_cls(module)
         return dist
 
-    def allreduce_mean(self, tensor):
+    def allreduce_sum(self, tensor):
         """
         inplace allreduce-mean
         """

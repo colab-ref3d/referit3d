@@ -56,15 +56,15 @@ class LinkDistMgr(BaseDistMgr):
         self.world_size = 1
 
     def init_dist(self):
-        link.initialize(num_devices=2)
+        link.initialize()
         torch.cuda.set_device(link.get_device_id(0))
         rank = link.get_rank()
         world_size = link.get_world_size()
         self.rank, self.world_size = rank, world_size
         return rank, world_size
 
-    def allreduce_mean(self, tensor):
-        link.allreduce(tensor, reduce_op=link.comm.allreduceOp_t.Avg)
+    def allreduce_sum(self, tensor):
+        link.allreduce(tensor)
 
     def get_rank(self):
         return self.rank

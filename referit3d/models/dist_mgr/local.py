@@ -6,7 +6,7 @@ class LocalDistModuleWrapper(DistModuleImpl):
 
 
 class LocalDistMgr(BaseDistMgr):
-    def allreduce_mean(self, tensor):
+    def allreduce_sum(self, tensor):
         pass
 
     def init_dist(self):
