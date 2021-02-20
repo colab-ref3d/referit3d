@@ -10,7 +10,7 @@ import torch.nn as nn
 from torch import optim
 from termcolor import colored
 
-from referit3d.in_out.arguments import parse_arguments, prepare_log_files
+from referit3d.utils.arguments import parse_arguments, prepare_log_files
 from referit3d.in_out.neural_net_oriented import load_scan_related_data, load_referential_data
 from referit3d.in_out.neural_net_oriented import compute_auxiliary_data, trim_scans_per_referit3d_data
 from referit3d.in_out.pt_datasets.listening_dataset import make_data_loaders

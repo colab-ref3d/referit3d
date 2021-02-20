@@ -12,7 +12,7 @@ import pprint
 import os.path as osp
 from datetime import datetime
 from argparse import ArgumentParser
-from ..utils import str2bool, create_dir
+from referit3d.utils import str2bool, create_dir
 
 
 def parse_arguments(notebook_options=None):
@@ -85,6 +85,7 @@ def parse_arguments(notebook_options=None):
                                                                           'language only is added.')
     parser.add_argument('--obj-cls-alpha', type=float, default=0.5, help='if > 0 a loss for guessing for each segmented'
                                                                          ' object its class type is added.')
+    parser.add_argument('--ref-cls-alpha', type=float, default=1., help='tradeoff for text-obj grounding clf')
 
     #
     # Misc arguments

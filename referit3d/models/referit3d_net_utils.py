@@ -115,22 +115,20 @@ def compute_losses(batch, res, criterion_dict, args):
     :param args, argparse.Namespace
     :return: scalar loss value
     """
+
+    obj_clf_loss = lang_clf_loss = referential_loss = 0.
+
+    total_loss = 0.
+
     # Get the object language classification loss and the object classification loss
-    criterion = criterion_dict['logits']
-    logits = res['logits']
-
-    # Panos-note investigating tb output (if you do it like this, it does not separate, later additions
-    # to total_loss from TODO POST DEADLINE.
-    # referential_loss)
-    # referential_loss = criterion(logits, batch['target_pos'])
-    # total_loss = referential_loss
-    if args.s_vs_n_weight is not None:
-        total_loss = criterion(logits, batch)
-    else:
-        total_loss = criterion(logits, batch['target_pos'])
-
-    referential_loss = total_loss.item()
-    obj_clf_loss = lang_clf_loss = 0
+    if args.ref_cls_alpha > 0:
+        criterion = criterion_dict['logits']
+        logits = res['logits']
+        if args.s_vs_n_weight is not None:
+            referential_loss = criterion(logits, batch)
+        else:
+            referential_loss = criterion(logits, batch['target_pos'])
+        total_loss += referential_loss * args.ref_cls_alpha
 
     if args.obj_cls_alpha > 0:
         criterion = criterion_dict['class_logits']
