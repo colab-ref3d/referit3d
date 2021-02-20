@@ -37,7 +37,7 @@ class DistAverageMeter(_AverageMeter):
             val = torch.tensor(val)
             is_tensor = False
         dist_mgr.allreduce_sum(val)
-        val = val / dist_mgr.get_world_size
+        val = val / dist_mgr.get_world_size()
         if not is_tensor:
             val = val.item()
         return super().update(val, n)

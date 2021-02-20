@@ -52,6 +52,17 @@ if __name__ == '__main__':
     # Parse arguments
     args = parse_arguments()
 
+    # Set random seed
+    seed_training_code(args.random_seed)
+
+    # Setup dist training
+    dist_mgr = dynamic_import(args.dist_mgr)()
+    rank, world_size = dist_mgr.init_dist()
+    set_rank(rank)
+    print(f'dist rank:{rank}/{world_size}')
+    if rank == 0:
+        prepare_log_files(args)
+
     # Read the scan related information
     all_scans_in_dict, scans_split, class_to_idx = load_scan_related_data(args.scannet_file)
 
@@ -66,7 +77,6 @@ if __name__ == '__main__':
     set_gpu_to_zero_position(args.gpu)  # Pnet++ seems to work only at "gpu:0"
     torch.backends.cudnn.benchmark = True
     device = torch.device('cuda')
-    seed_training_code(args.random_seed)
 
     # Losses:
     criteria = dict()
@@ -102,17 +112,9 @@ if __name__ == '__main__':
     n_classes = len(class_to_idx) - 1  # -1 to ignore the <pad> class
     pad_idx = class_to_idx['pad']
 
-    model = instantiate_referit3d_net(args, vocab, n_classes).to(device)
-
-    dist_mgr = dynamic_import(args.dist_mgr)()
-    rank, world_size = dist_mgr.init_dist()
-    set_rank(rank)
-    print(f'dist rank:{rank}/{world_size}')
-
     data_loaders = make_data_loaders(dist_mgr, args, referit_data, vocab, class_to_idx, all_scans_in_dict, mean_rgb)
-    if rank == 0:
-        prepare_log_files(args)
 
+    model = instantiate_referit3d_net(args, vocab, n_classes).to(device)
     model = dist_mgr.get_dist_module(model)
     optimizer = optim.Adam(model.parameters(), lr=args.init_lr)
     lr_scheduler = torch.optim.lr_scheduler.ReduceLROnPlateau(optimizer, mode='max', factor=0.65,

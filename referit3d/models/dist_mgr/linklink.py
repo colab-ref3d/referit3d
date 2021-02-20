@@ -27,7 +27,7 @@ class DistModule(torch.nn.Module):
 
     def _make_hook(self, name, p, i):
         def hook(*ignore):
-            link.allreduce_async(name, p.grad.data, reduce_op=link.comm.allreduceOp_t.Avg)
+            link.allreduce_async(name, p.grad.data)
 
         return hook
 
@@ -36,7 +36,7 @@ class DistModule(torch.nn.Module):
         if self.sync and link.get_world_size() > 1:
             for name, param in self.module.named_parameters():
                 if param.requires_grad:
-                    link.allreduce(param.grad.data, reduce_op=link.comm.allreduceOp_t.Avg)
+                    link.allreduce(param.grad.data)
         else:
             link.synchronize()
 
