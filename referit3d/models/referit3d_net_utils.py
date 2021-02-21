@@ -152,6 +152,7 @@ def compute_losses(batch, res, criterion_dict, args):
         def _dot(a, b):
             return torch.sum(a * b, -1)
 
+        language_features = language_features.unsqueeze(1)  # B x 1 x Ndim
         sim = _dot(language_features, graph_features)  # B x Nobj
         sim = sim * target_msk  # set non-distractors' sim to zero
         cl_logits = torch.softmax(sim, -1)
