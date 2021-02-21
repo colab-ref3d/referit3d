@@ -37,6 +37,8 @@ if __name__ == '__main__':
             info = '{}: Total-Loss {:.4f}, Listening-Acc {:.4f}'.format(phase,
                                                                         meters[phase + '_total_loss'],
                                                                         meters[phase + '_referential_acc'])
+            if args.cl_alpha > 0:
+                info += ', Contrastive-Loss: {:.4f}'.format(meters[phase + '_cl_loss'])
 
             if args.obj_cls_alpha > 0:
                 info += ', Object-Clf-Acc: {:.4f}'.format(meters[phase + '_object_cls_acc'])

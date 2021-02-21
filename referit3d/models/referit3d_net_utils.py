@@ -45,6 +45,7 @@ def single_epoch_train(model, data_loader, criteria, optimizer, device, pad_idx,
     metrics = dict()  # holding the losses/accuracies
     total_loss_mtr = AverageMeter(dist_mgr)
     referential_loss_mtr = AverageMeter(dist_mgr)
+    cl_loss_mtr = AverageMeter(dist_mgr)
     obj_loss_mtr = AverageMeter(dist_mgr)
     ref_acc_mtr = AverageMeter(dist_mgr)
     cls_acc_mtr = AverageMeter(dist_mgr)
@@ -107,6 +108,7 @@ def single_epoch_train(model, data_loader, criteria, optimizer, device, pad_idx,
     metrics['train_referential_acc'] = ref_acc_mtr.avg
     metrics['train_object_cls_acc'] = cls_acc_mtr.avg
     metrics['train_txt_cls_acc'] = txt_acc_mtr.avg
+    metrics['train_cl_loss'] = cl_loss_mtr.avg
     return metrics
 
 
@@ -235,6 +237,7 @@ def evaluate_on_dataset(model, data_loader, criteria, device, pad_idx, dist_mgr,
     metrics['test_referential_acc'] = ref_acc_mtr.avg
     metrics['test_object_cls_acc'] = cls_acc_mtr.avg
     metrics['test_txt_cls_acc'] = txt_acc_mtr.avg
+    metrics['test_cl_loss'] = cl_loss_mtr.avg
     return metrics
 
 
