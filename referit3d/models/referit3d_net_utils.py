@@ -102,6 +102,9 @@ def single_epoch_train(model, data_loader, criteria, optimizer, device, pad_idx,
             cls_b_acc = torch.mean((batch_guess == batch['target_class']).double())
             txt_acc_mtr.update(cls_b_acc, batch_size)
 
+        if args.cl_alpha > 0:
+            cl_loss_mtr.update(all_losses['cl_loss'], batch_size)
+
     metrics['train_total_loss'] = total_loss_mtr.avg
     metrics['train_referential_loss'] = referential_loss_mtr.avg
     metrics['train_obj_clf_loss'] = obj_loss_mtr.avg
@@ -156,8 +159,10 @@ def compute_losses(batch, res, criterion_dict, args):
 
         language_features = language_features.unsqueeze(1)  # B x 1 x Ndim
         sim = _dot(language_features, graph_features)  # B x Nobj
-        sim = sim * target_msk  # set non-distractors' sim to zero
-        cl_logits = torch.softmax(sim, -1)
+        # sim = sim * target_msk  # set non-distractors' sim to zero
+        # cl_logits = torch.softmax(sim, -1)
+        expsim = sim.exp() * target_msk  # set non-distractors' expsim to zero
+        cl_logits = expsim / expsim.sum(-1)
         cl_loss = torch.nn.CrossEntropyLoss()(cl_logits, target_pos)
         total_loss += cl_loss * args.cl_alpha
 
