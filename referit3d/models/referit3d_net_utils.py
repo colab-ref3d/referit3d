@@ -156,10 +156,11 @@ def compute_losses(batch, res, criterion_dict, args):
 
         def _dot(a, b):
             return torch.sum(a * b, -1)
+
         language_features = language_features.unsqueeze(1)  # B x 1 x Ndim
 
         class FocalLoss(torch.nn.Module):
-            def __init__(self, alpha=1, gamma=2, logits=False, reduce=True):
+            def __init__(self, alpha=1., gamma=2, logits=False, reduce=True):
                 super(FocalLoss, self).__init__()
                 self.alpha = alpha
                 self.gamma = gamma
@@ -167,17 +168,16 @@ def compute_losses(batch, res, criterion_dict, args):
                 self.reduce = reduce
 
             def forward(self, inputs, targets):
-                if self.logits:
-                    BCE_loss = F.binary_cross_entropy_with_logits(inputs, targets, reduce=False)
-                else:
-                    BCE_loss = F.binary_cross_entropy(inputs, targets, reduce=False)
-                pt = torch.exp(-BCE_loss)
-                F_loss = self.alpha * (1 - pt) ** self.gamma * BCE_loss
+                assert not self.logits
+                pt = (1 - inputs) * targets + inputs * (1 - targets)
+                alpha = self.alpha
+                focal_weight = (alpha * targets + (1 - alpha) * (1 - targets)) * pt.pow(self.gamma)
+                loss = F.binary_cross_entropy(inputs, targets, reduce=False) * focal_weight
 
                 if self.reduce:
-                    return torch.mean(F_loss)
+                    return torch.mean(loss)
                 else:
-                    return F_loss
+                    return loss
 
         if args.cl_type == 'infonce':
             sim = _dot(language_features, graph_features)  # B x Nobj
@@ -197,7 +197,6 @@ def compute_losses(batch, res, criterion_dict, args):
             cl_loss = cl_loss[target_msk].mean()
 
         total_loss += cl_loss * args.cl_alpha
-
 
     return {'total_loss': total_loss, 'referential_loss': referential_loss,
             'obj_clf_loss': obj_clf_loss, 'lang_clf_loss': lang_clf_loss,
