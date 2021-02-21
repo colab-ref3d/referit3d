@@ -162,7 +162,7 @@ def compute_losses(batch, res, criterion_dict, args):
         # sim = sim * target_msk  # set non-distractors' sim to zero
         # cl_logits = torch.softmax(sim, -1)
         expsim = sim.exp() * target_msk  # set non-distractors' expsim to zero
-        cl_logits = expsim / expsim.sum(-1)
+        cl_logits = expsim / expsim.sum(-1, keepdim=True)
         cl_loss = torch.nn.CrossEntropyLoss()(cl_logits, target_pos)
         total_loss += cl_loss * args.cl_alpha
 
