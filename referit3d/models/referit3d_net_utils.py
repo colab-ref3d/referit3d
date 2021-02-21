@@ -23,6 +23,9 @@ def make_batch_keys(args, extras=None):
     if args.lang_cls_alpha > 0:
         batch_keys.append('target_class')
 
+    if args.cl_alpha > 0:
+        batch_keys.append('target_class_mask')
+
     return batch_keys
 
 
@@ -116,7 +119,7 @@ def compute_losses(batch, res, criterion_dict, args):
     :return: scalar loss value
     """
 
-    obj_clf_loss = lang_clf_loss = referential_loss = 0.
+    obj_clf_loss = lang_clf_loss = referential_loss = cl_loss = 0.
 
     total_loss = 0.
 
@@ -140,8 +143,26 @@ def compute_losses(batch, res, criterion_dict, args):
         lang_clf_loss = criterion(res['lang_logits'], batch['target_class'])
         total_loss += lang_clf_loss * args.lang_cls_alpha
 
+    if args.cl_alpha > 0:
+        graph_features = res['graph_features']
+        language_features = res['language_features']  # TODO hard linear?
+        target_pos = batch['target_pos']
+        target_msk = batch['target_class_mask']  # B x Nobj
+
+        def _dot(a, b):
+            return torch.sum(a * b, -1)
+
+        sim = _dot(language_features, graph_features)  # B x Nobj
+        sim = sim * target_msk  # set non-distractors' sim to zero
+        cl_logits = torch.softmax(sim, -1)
+        cl_loss = torch.nn.CrossEntropyLoss()(cl_logits, target_pos)
+        total_loss += cl_loss * args.cl_alpha
+
+
     return {'total_loss': total_loss, 'referential_loss': referential_loss,
-            'obj_clf_loss': obj_clf_loss, 'lang_clf_loss': lang_clf_loss}
+            'obj_clf_loss': obj_clf_loss, 'lang_clf_loss': lang_clf_loss,
+            'cl_loss': cl_loss,
+            }
 
 
 @torch.no_grad()
@@ -151,6 +172,7 @@ def evaluate_on_dataset(model, data_loader, criteria, device, pad_idx, dist_mgr,
     total_loss_mtr = AverageMeter(dist_mgr)
     referential_loss_mtr = AverageMeter(dist_mgr)
     obj_loss_mtr = AverageMeter(dist_mgr)
+    cl_loss_mtr = AverageMeter(dist_mgr)
     ref_acc_mtr = AverageMeter(dist_mgr)
     cls_acc_mtr = AverageMeter(dist_mgr)
     txt_acc_mtr = AverageMeter(dist_mgr)
@@ -203,6 +225,8 @@ def evaluate_on_dataset(model, data_loader, criteria, device, pad_idx, dist_mgr,
             batch_guess = torch.argmax(res['lang_logits'], -1)
             cls_b_acc = torch.mean((batch_guess == batch['target_class']).double())
             txt_acc_mtr.update(cls_b_acc, batch_size)
+        if args.cl_alpha > 0:
+            cl_loss_mtr.update(all_losses['cl_loss'], batch_size)
 
     metrics['test_total_loss'] = total_loss_mtr.avg
     metrics['test_referential_loss'] = referential_loss_mtr.avg

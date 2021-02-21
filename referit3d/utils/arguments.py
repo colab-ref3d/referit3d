@@ -86,6 +86,7 @@ def parse_arguments(notebook_options=None):
     parser.add_argument('--obj-cls-alpha', type=float, default=0.5, help='if > 0 a loss for guessing for each segmented'
                                                                          ' object its class type is added.')
     parser.add_argument('--ref-cls-alpha', type=float, default=1., help='tradeoff for text-obj grounding clf')
+    parser.add_argument('--cl-alpha', type=float, default=0.)
 
     #
     # Misc arguments

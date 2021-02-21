@@ -55,7 +55,7 @@ class ReferIt3DNet(nn.Module):
         self.language_clf = language_clf
         self.object_language_clf = object_language_clf
 
-    def __call__(self, batch: dict) -> dict:
+    def __call__(self, batch: dict, keep_graph_features=True, keep_language_features=True) -> dict:
         result = defaultdict(lambda: None)
 
         # Get features for each segmented scan object based on color and point-cloud
@@ -92,6 +92,12 @@ class ReferIt3DNet(nn.Module):
             final_features = graph_out_features
 
         result['logits'] = get_siamese_features(self.object_language_clf, final_features, torch.cat)
+
+        if keep_graph_features:
+            result['graph_features'] = graph_out_features
+
+        if keep_language_features:
+            result['language_features'] = lang_features
 
         return result
 

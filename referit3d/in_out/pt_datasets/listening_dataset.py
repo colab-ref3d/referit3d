@@ -41,40 +41,43 @@ class ListeningDataset(Dataset):
 
         return scan, target, tokens, is_nr3d
 
-    def prepare_distractors(self, scan, target):
+    def prepare_objects(self, scan, target):
         target_label = target.instance_label
 
         # First add all objects with the same instance-label as the target
-        distractors = [o for o in scan.three_d_objects if
+        objs = [o for o in scan.three_d_objects if
                        (o.instance_label == target_label and (o != target))]
 
         # Then all more objects up to max-number of distractors
-        already_included = {target_label}
-        clutter = [o for o in scan.three_d_objects if o.instance_label not in already_included]
-        np.random.shuffle(clutter)
+        clutter = [o for o in scan.three_d_objects if
+                   o.instance_label != target_label]
 
-        distractors.extend(clutter)
-        distractors = distractors[:self.max_distractors]
-        np.random.shuffle(distractors)
+        np.random.shuffle(clutter)  # randomly select part of clutter objects
+        objs.extend(clutter)
+        objs = objs[:self.max_distractors]
+        objs.append(target)
+        np.random.shuffle(objs)
 
-        return distractors
+        target_pos = np.random.randint(len(objs) + 1)
+        objs.insert(target_pos, target)
+
+        target_cls_msk = map(lambda o: o.instance_label == target_label, objs)
+        target_cls_msk = np.array(target_cls_msk, dtype=np.bool)
+
+        return objs, target_pos, target_cls_msk
 
     def __getitem__(self, index):
         res = dict()
         scan, target, tokens, is_nr3d = self.get_reference_data(index)
 
         # Make a context of distractors
-        context = self.prepare_distractors(scan, target)
-
-        # Add target object in 'context' list
-        target_pos = np.random.randint(len(context) + 1)
-        context.insert(target_pos, target)
+        objs, target_pos, target_cls_msk = self.prepare_objects(scan, target)
 
         # sample point/color for them
-        samples = np.array([sample_scan_object(o, self.points_per_object) for o in context])
+        samples = np.array([sample_scan_object(o, self.points_per_object) for o in objs])
 
         # mark their classes
-        res['class_labels'] = instance_labels_of_context(context, self.max_context_size, self.class_to_idx)
+        res['class_labels'] = instance_labels_of_context(objs, self.max_context_size, self.class_to_idx)
 
         if self.object_transformation is not None:
             samples = self.object_transformation(samples)
@@ -86,7 +89,7 @@ class ListeningDataset(Dataset):
 
         # Get a mask indicating which objects have the same instance-class as the target.
         target_class_mask = np.zeros(self.max_context_size, dtype=np.bool)
-        target_class_mask[:len(context)] = [target.instance_label == o.instance_label for o in context]
+        target_class_mask[:len(objs)] = target_cls_msk
 
         res['target_class'] = self.class_to_idx[target.instance_label]
         res['target_pos'] = target_pos
@@ -98,11 +101,11 @@ class ListeningDataset(Dataset):
             distrators_pos = np.zeros((6))  # 6 is the maximum context size we used in dataset collection
             object_ids = np.zeros((self.max_context_size))
             j = 0
-            for k, o in enumerate(context):
+            for k, o in enumerate(objs):
                 if o.instance_label == target.instance_label and o.object_id != target.object_id:
                     distrators_pos[j] = k
                     j += 1
-            for k, o in enumerate(context):
+            for k, o in enumerate(objs):
                 object_ids[k] = o.object_id
             res['utterance'] = self.references.loc[index]['utterance']
             res['stimulus_id'] = self.references.loc[index]['stimulus_id']
