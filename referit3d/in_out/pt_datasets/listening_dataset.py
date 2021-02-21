@@ -60,7 +60,7 @@ class ListeningDataset(Dataset):
         target_pos = np.random.randint(len(objs) + 1)
         objs.insert(target_pos, target)
 
-        target_cls_msk = map(lambda o: o.instance_label == target_label, objs)
+        target_cls_msk = [o.instance_label == target_label for o in objs]
         target_cls_msk = np.array(target_cls_msk, dtype=np.bool)
 
         return objs, target_pos, target_cls_msk
