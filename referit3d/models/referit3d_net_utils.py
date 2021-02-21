@@ -192,7 +192,9 @@ def compute_losses(batch, res, criterion_dict, args):
             onehot = torch.zeros_like(dim)
             onehot.scatter_(1, target_pos.unsqueeze(1), 1)
             # using focal loss to balance the pos-neg samples
-            cl_loss = FocalLoss()(dim, onehot)
+            cl_loss = FocalLoss(reduce=False)(dim, onehot)
+            target_msk = target_msk > 0
+            cl_loss = cl_loss[target_msk].mean()
 
         total_loss += cl_loss * args.cl_alpha
 
