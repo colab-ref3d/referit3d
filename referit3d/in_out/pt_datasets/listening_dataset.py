@@ -55,7 +55,6 @@ class ListeningDataset(Dataset):
         np.random.shuffle(clutter)  # randomly select part of clutter objects
         objs.extend(clutter)
         objs = objs[:self.max_distractors]
-        objs.append(target)
         np.random.shuffle(objs)
 
         target_pos = np.random.randint(len(objs) + 1)
