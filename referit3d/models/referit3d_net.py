@@ -109,7 +109,7 @@ class ReferIt3DNet(nn.Module):
 
         if self.dim_D is not None:
             dim_logits = get_siamese_features(self.dim_D, final_features, torch.cat)
-            dim_logits = dim_logits.unsqueeze(-1)  # B x Nobj
+            dim_logits = dim_logits.squeeze(-1)  # B x Nobj
             result['dim_logits'] = dim_logits
 
         return result

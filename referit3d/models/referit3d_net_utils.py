@@ -183,13 +183,14 @@ def compute_losses(batch, res, criterion_dict, args):
             sim = _dot(language_features, graph_features)  # B x Nobj
             expsim = sim.exp() * target_msk  # set non-distractors' expsim to zero
             cl_logits = expsim / expsim.sum(-1, keepdim=True)
-            cl_logits[target_msk.byte()].log_()  # log-softmax
+            target_msk = target_msk > 0  # compatible with old version
+            cl_logits[target_msk].log_()  # log-softmax
             cl_loss = torch.nn.NLLLoss()(cl_logits, target_pos)
         elif args.cl_type == 'dim':
             assert 'dim_logits' in res, 'for dim learning, should output the sim score'
             dim = res['dim_logits']
             onehot = torch.zeros_like(dim)
-            onehot.scatter_(1, target_pos, 1)
+            onehot.scatter_(1, target_pos.unsqueeze(1), 1)
             # using focal loss to balance the pos-neg samples
             cl_loss = FocalLoss()(dim, onehot)
 
