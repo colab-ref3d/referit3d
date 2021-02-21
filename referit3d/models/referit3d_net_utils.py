@@ -156,14 +156,43 @@ def compute_losses(batch, res, criterion_dict, args):
 
         def _dot(a, b):
             return torch.sum(a * b, -1)
-
         language_features = language_features.unsqueeze(1)  # B x 1 x Ndim
-        sim = _dot(language_features, graph_features)  # B x Nobj
-        # sim = sim * target_msk  # set non-distractors' sim to zero
-        # cl_logits = torch.softmax(sim, -1)
-        expsim = sim.exp() * target_msk  # set non-distractors' expsim to zero
-        cl_logits = expsim / expsim.sum(-1, keepdim=True)
-        cl_loss = torch.nn.CrossEntropyLoss()(cl_logits, target_pos)
+
+        class FocalLoss(torch.nn.Module):
+            def __init__(self, alpha=1, gamma=2, logits=False, reduce=True):
+                super(FocalLoss, self).__init__()
+                self.alpha = alpha
+                self.gamma = gamma
+                self.logits = logits
+                self.reduce = reduce
+
+            def forward(self, inputs, targets):
+                if self.logits:
+                    BCE_loss = F.binary_cross_entropy_with_logits(inputs, targets, reduce=False)
+                else:
+                    BCE_loss = F.binary_cross_entropy(inputs, targets, reduce=False)
+                pt = torch.exp(-BCE_loss)
+                F_loss = self.alpha * (1 - pt) ** self.gamma * BCE_loss
+
+                if self.reduce:
+                    return torch.mean(F_loss)
+                else:
+                    return F_loss
+
+        if args.cl_type == 'infonce':
+            sim = _dot(language_features, graph_features)  # B x Nobj
+            expsim = sim.exp() * target_msk  # set non-distractors' expsim to zero
+            cl_logits = expsim / expsim.sum(-1, keepdim=True)
+            cl_logits[target_msk.byte()].log_()  # log-softmax
+            cl_loss = torch.nn.NLLLoss()(cl_logits, target_pos)
+        elif args.cl_type == 'dim':
+            assert 'dim_logits' in res, 'for dim learning, should output the sim score'
+            dim = res['dim_logits']
+            onehot = torch.zeros_like(dim)
+            onehot.scatter_(1, target_pos, 1)
+            # using focal loss to balance the pos-neg samples
+            cl_loss = FocalLoss()(dim, onehot)
+
         total_loss += cl_loss * args.cl_alpha
 
 

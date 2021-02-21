@@ -87,6 +87,7 @@ def parse_arguments(notebook_options=None):
                                                                          ' object its class type is added.')
     parser.add_argument('--ref-cls-alpha', type=float, default=1., help='tradeoff for text-obj grounding clf')
     parser.add_argument('--cl-alpha', type=float, default=0.)
+    parser.add_argument('--cl-type', type=str, default='infonce')
 
     #
     # Misc arguments

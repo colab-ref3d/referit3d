@@ -55,6 +55,14 @@ class ReferIt3DNet(nn.Module):
         self.language_clf = language_clf
         self.object_language_clf = object_language_clf
 
+        if args.cl_type == 'dim':
+            dim_dim_in = args.graph_out_dim + args.language_latent_dim
+            self.dim_D = MLP(in_feat_dims=dim_dim_in,
+                             out_channels=[dim_dim_in, dim_dim_in // 2, 1],
+                             closure=nn.Sigmoid())
+        else:
+            self.dim_D = None
+
     def __call__(self, batch: dict, keep_graph_features=True, keep_language_features=True) -> dict:
         result = defaultdict(lambda: None)
 
@@ -98,6 +106,11 @@ class ReferIt3DNet(nn.Module):
 
         if keep_language_features:
             result['language_features'] = lang_features
+
+        if self.dim_D is not None:
+            dim_logits = get_siamese_features(self.dim_D, final_features, torch.cat)
+            dim_logits = dim_logits.unsqueeze(-1)  # B x Nobj
+            result['dim_logits'] = dim_logits
 
         return result
 
