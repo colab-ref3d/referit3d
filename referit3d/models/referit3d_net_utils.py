@@ -184,7 +184,7 @@ def compute_losses(batch, res, criterion_dict, args):
             expsim = sim.exp() * target_msk  # set non-distractors' expsim to zero
             cl_logits = expsim / expsim.sum(-1, keepdim=True)
             target_msk = target_msk > 0  # compatible with old version
-            cl_logits[target_msk].log_()  # log-softmax
+            cl_logits[target_msk] = cl_logits[target_msk].log()  # log-softmax
             cl_loss = torch.nn.NLLLoss()(cl_logits, target_pos)
         elif args.cl_type == 'dim':
             assert 'dim_logits' in res, 'for dim learning, should output the sim score'
