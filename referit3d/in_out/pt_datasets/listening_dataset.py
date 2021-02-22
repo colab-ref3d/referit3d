@@ -13,7 +13,7 @@ from ...data_generation.nr3d import decode_stimulus_string
 class ListeningDataset(Dataset):
     def __init__(self, references, scans, vocab, max_seq_len, points_per_object, max_distractors,
                  class_to_idx=None, object_transformation=None,
-                 visualization=False):
+                 visualization=False, max_same_class_distractors=-1):
 
         self.references = references
         self.scans = scans
@@ -25,6 +25,7 @@ class ListeningDataset(Dataset):
         self.class_to_idx = class_to_idx
         self.visualization = visualization
         self.object_transformation = object_transformation
+        self.max_same_class_distractors = max_same_class_distractors
 
         if not check_segmented_object_order(scans):
             raise ValueError
@@ -47,6 +48,9 @@ class ListeningDataset(Dataset):
         # First add all objects with the same instance-label as the target
         distractors = [o for o in scan.three_d_objects if
                        (o.instance_label == target_label and (o != target))]
+
+        if self.max_same_class_distractors >= 0:
+            distractors = distractors[:self.max_same_class_distractors]
 
         # Then all more objects up to max-number of distractors
         already_included = {target_label}
@@ -156,7 +160,9 @@ def make_data_loaders(dist_mgr, args, referit_data, vocab, class_to_idx, scans, 
                                    max_distractors=max_distractors,
                                    class_to_idx=class_to_idx,
                                    object_transformation=object_transformation,
-                                   visualization=args.mode == 'evaluate')
+                                   visualization=args.mode == 'evaluate',
+                                   max_same_class_distractors=args.max_same_class_distractors,
+                                   )
 
         seed = None
         if split == 'test':

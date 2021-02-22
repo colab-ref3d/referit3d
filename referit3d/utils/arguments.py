@@ -41,6 +41,7 @@ def parse_arguments(notebook_options=None):
     #
     parser.add_argument('--max-distractors', type=int, default=51,
                         help='Maximum number of distracting objects to be drawn from a scan.')
+    parser.add_argument('--max-same-class-distractors', type=int, default=-1)
     parser.add_argument('--max-seq-len', type=int, default=24,
                         help='utterances with more tokens than this they will be ignored.')
     parser.add_argument('--points-per-object', type=int, default=1024,
