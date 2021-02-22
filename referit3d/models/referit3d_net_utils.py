@@ -46,6 +46,7 @@ def single_epoch_train(model, data_loader, criteria, optimizer, device, pad_idx,
     total_loss_mtr = AverageMeter(dist_mgr)
     referential_loss_mtr = AverageMeter(dist_mgr)
     cl_loss_mtr = AverageMeter(dist_mgr)
+    cl_acc_mtr = AverageMeter(dist_mgr)
     obj_loss_mtr = AverageMeter(dist_mgr)
     ref_acc_mtr = AverageMeter(dist_mgr)
     cls_acc_mtr = AverageMeter(dist_mgr)
@@ -104,6 +105,10 @@ def single_epoch_train(model, data_loader, criteria, optimizer, device, pad_idx,
 
         if args.cl_alpha > 0:
             cl_loss_mtr.update(all_losses['cl_loss'], batch_size)
+            cl_pred = torch.argmax(res['cl_loss'], -1)
+            cl_acc = torch.mean(cl_pred == batch['target_class']).double()
+            cl_acc_mtr.update(cl_acc, batch_size)
+
 
     metrics['train_total_loss'] = total_loss_mtr.avg
     metrics['train_referential_loss'] = referential_loss_mtr.avg
@@ -112,6 +117,7 @@ def single_epoch_train(model, data_loader, criteria, optimizer, device, pad_idx,
     metrics['train_object_cls_acc'] = cls_acc_mtr.avg
     metrics['train_txt_cls_acc'] = txt_acc_mtr.avg
     metrics['train_cl_loss'] = cl_loss_mtr.avg
+    metrics['train_cl_acc'] = cl_acc_mtr.avg
     return metrics
 
 
@@ -188,14 +194,17 @@ def compute_losses(batch, res, criterion_dict, args):
             cl_loss = torch.nn.NLLLoss()(cl_logits, target_pos)
         elif args.cl_type == 'dim':
             assert 'dim_logits' in res, 'for dim learning, should output the sim score'
-            dim = res['dim_logits']
-            onehot = torch.zeros_like(dim)
+            cl_logits = res['dim_logits']
+            onehot = torch.zeros_like(cl_logits)
             onehot.scatter_(1, target_pos.unsqueeze(1), 1)
             # using focal loss to balance the pos-neg samples
-            cl_loss = FocalLoss(reduce=False)(dim, onehot)
+            cl_loss = FocalLoss(reduce=False)(cl_logits, onehot)
             target_msk = target_msk > 0
             cl_loss = cl_loss[target_msk].mean()
+        else:
+            raise ValueError(f'bad cl_type:{args.cl_type}')
 
+        res['cl_logits'] = cl_logits  # bad flavor. TODO move this into model forward
         total_loss += cl_loss * args.cl_alpha
 
     return {'total_loss': total_loss, 'referential_loss': referential_loss,
@@ -215,6 +224,7 @@ def evaluate_on_dataset(model, data_loader, criteria, device, pad_idx, dist_mgr,
     ref_acc_mtr = AverageMeter(dist_mgr)
     cls_acc_mtr = AverageMeter(dist_mgr)
     txt_acc_mtr = AverageMeter(dist_mgr)
+    cl_acc_mtr = AverageMeter(dist_mgr)
 
     # Set the model in training mode
     model.eval()
@@ -267,6 +277,12 @@ def evaluate_on_dataset(model, data_loader, criteria, device, pad_idx, dist_mgr,
         if args.cl_alpha > 0:
             cl_loss_mtr.update(all_losses['cl_loss'], batch_size)
 
+        if args.cl_alpha > 0:
+            cl_loss_mtr.update(all_losses['cl_loss'], batch_size)
+            cl_pred = torch.argmax(res['cl_loss'], -1)
+            cl_acc = torch.mean(cl_pred == batch['target_class']).double()
+            cl_acc_mtr.update(cl_acc, batch_size)
+
     metrics['test_total_loss'] = total_loss_mtr.avg
     metrics['test_referential_loss'] = referential_loss_mtr.avg
     metrics['test_obj_clf_loss'] = obj_loss_mtr.avg
@@ -274,6 +290,7 @@ def evaluate_on_dataset(model, data_loader, criteria, device, pad_idx, dist_mgr,
     metrics['test_object_cls_acc'] = cls_acc_mtr.avg
     metrics['test_txt_cls_acc'] = txt_acc_mtr.avg
     metrics['test_cl_loss'] = cl_loss_mtr.avg
+    metrics['test_cl_acc'] = cl_acc_mtr.avg
     return metrics
 
 
