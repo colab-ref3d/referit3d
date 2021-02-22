@@ -23,6 +23,9 @@ def make_batch_keys(args, extras=None):
     if args.lang_cls_alpha > 0:
         batch_keys.append('target_class')
 
+    if args.fuse_position:
+        batch_keys.append('positions')
+
     return batch_keys
 
 

@@ -72,6 +72,8 @@ def parse_arguments(notebook_options=None):
                                                                               'directObj2Lang',
                                                                               'referIt3DNetAttentive'])
     parser.add_argument('--object-latent-dim', type=int, default=128)
+    parser.add_argument('--position-latent-dim', type=int, default=6)  # Fixed, pls not specify
+    parser.add_argument('--fuse-position', type=bool, default=True)
     parser.add_argument('--language-latent-dim', type=int, default=128)
     parser.add_argument('--word-embedding-dim', type=int, default=64)
     parser.add_argument('--graph-out-dim', type=int, default=128)

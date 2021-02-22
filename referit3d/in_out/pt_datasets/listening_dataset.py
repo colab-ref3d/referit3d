@@ -71,6 +71,8 @@ class ListeningDataset(Dataset):
         context.insert(target_pos, target)
 
         # sample point/color for them
+        positions = np.array([o.get_bbox().pos() for o in context])
+        positions = np.expand_dims(positions, axis=1)
         samples = np.array([sample_scan_object(o, self.points_per_object) for o in context])
 
         # mark their classes
@@ -83,6 +85,7 @@ class ListeningDataset(Dataset):
 
         # take care of padding, so that a batch has same number of N-objects across scans.
         res['objects'] = pad_samples(samples, self.max_context_size)
+        res['positions'] = pad_samples(positions, self.max_context_size)
 
         # Get a mask indicating which objects have the same instance-class as the target.
         target_class_mask = np.zeros(self.max_context_size, dtype=np.bool)

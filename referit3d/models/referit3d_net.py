@@ -7,6 +7,7 @@ from . import DGCNN
 from .default_blocks import *
 from .utils import get_siamese_features
 from ..in_out.vocabulary import Vocabulary
+from .backbone.mlp import MLP
 
 try:
     from . import PointNetPP
@@ -45,6 +46,10 @@ class ReferIt3DNet(nn.Module):
         # The language fusion method (either before the graph encoder, after, or in both ways)
         self.language_fusion = args.language_fusion
 
+        # Position fusion
+        self.pos_fusion_layer = MLP(args.object_latent_dim + args.position_latent_dim, [args.object_latent_dim])
+        self.fuse_pos = args.fuse_position
+
         # Encoders
         self.object_encoder = object_encoder
         self.language_encoder = language_encoder
@@ -66,6 +71,13 @@ class ReferIt3DNet(nn.Module):
         if self.object_clf is not None:
             objects_classifier_features = objects_features
             result['class_logits'] = get_siamese_features(self.object_clf, objects_classifier_features, torch.stack)
+
+        # Fuse location information
+        if self.fuse_pos:
+            position_feature = batch['positions']
+            position_feature = torch.squeeze(position_feature, -2)
+            concat_feature = torch.cat((objects_features, position_feature), -1)
+            objects_features = self.pos_fusion_layer(concat_feature)
 
         # Get feature for utterance
         n_objects = batch['objects'].size(1)
