@@ -105,7 +105,7 @@ def single_epoch_train(model, data_loader, criteria, optimizer, device, pad_idx,
 
         if args.cl_alpha > 0:
             cl_loss_mtr.update(all_losses['cl_loss'], batch_size)
-            cl_pred = torch.argmax(res['cl_loss'], -1)
+            cl_pred = torch.argmax(res['cl_logits'], -1)
             cl_acc = torch.mean(cl_pred == batch['target_class']).double()
             cl_acc_mtr.update(cl_acc, batch_size)
 
@@ -279,7 +279,7 @@ def evaluate_on_dataset(model, data_loader, criteria, device, pad_idx, dist_mgr,
 
         if args.cl_alpha > 0:
             cl_loss_mtr.update(all_losses['cl_loss'], batch_size)
-            cl_pred = torch.argmax(res['cl_loss'], -1)
+            cl_pred = torch.argmax(res['cl_logits'], -1)
             cl_acc = torch.mean(cl_pred == batch['target_class']).double()
             cl_acc_mtr.update(cl_acc, batch_size)
 
