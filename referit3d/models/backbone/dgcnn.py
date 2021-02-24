@@ -115,7 +115,7 @@ class ReasonAwareDGCNN(nn.Module):
     """
 
     def __init__(self, initial_dim, lang_dim, out_dim, k_neighbors,
-                 intermediate_feat_dim=[64, 64, 128, 256], subtract_from_self=True):
+                 intermediate_feat_dim=[64, 64, 128, 256], subtract_from_self=True, attention_inner_squeeze_factor=2):
         super().__init__()
         print('Building DGCNN will have {} graph convolutions'.format(len(intermediate_feat_dim)))
         self.k = k_neighbors
@@ -133,10 +133,13 @@ class ReasonAwareDGCNN(nn.Module):
             self.layers.append(layer)
 
         self.lang_attn_layers = nn.ModuleList(
-            nn.Linear(lang_dim, fdim) for fdim in intermediate_feat_dim
+            nn.Linear(lang_dim, fdim // attention_inner_squeeze_factor) for fdim in intermediate_feat_dim
         )
         self.graph_attn_layers = nn.ModuleList(
-            nn.Linear(fdim, fdim) for fdim in intermediate_feat_dim
+            nn.Linear(fdim, fdim // attention_inner_squeeze_factor) for fdim in intermediate_feat_dim
+        )
+        self.attn_out_layers = nn.ModuleList(
+            nn.Linear(fdim // attention_inner_squeeze_factor, fdim) for fdim in intermediate_feat_dim
         )
 
         self.final_conv = nn.Sequential(nn.Conv1d(sum(intermediate_feat_dim), out_dim, kernel_size=1, bias=False),
@@ -155,12 +158,13 @@ class ReasonAwareDGCNN(nn.Module):
             obj_dim = 2
 
         intermediate_features = []
-        for layer, graph_enc, lang_enc in zip(self.layers, self.graph_attn_layers, self.lang_attn_layers):
+        for layer, graph_enc, lang_enc, attn_out in zip(self.layers, self.graph_attn_layers, self.lang_attn_layers, self.attn_out_layers):
             x = get_graph_feature(x, k=self.k, subtract=self.subtract_from_self, idx=spatial_knn)
             x = layer(x)
             lang_attn = torch.tanh(lang_enc(lang))
             graph_attn = torch.tanh(graph_enc(torch.mean(x, [obj_dim, 3])))
             dim_attn = lang_attn * graph_attn
+            dim_attn = attn_out(dim_attn)
             x = x * dim_attn.unsqueeze(obj_dim).unsqueeze(3)
             x = x.max(dim=-1)[0]
             intermediate_features.append(x)
