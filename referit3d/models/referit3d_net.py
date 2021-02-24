@@ -4,6 +4,7 @@ from torch import nn
 from collections import defaultdict
 
 from . import DGCNN
+from .backbone.dgcnn import ReasonAwareDGCNN
 from .default_blocks import *
 from .utils import get_siamese_features
 from ..in_out.vocabulary import Vocabulary
@@ -84,7 +85,7 @@ class ReferIt3DNet(nn.Module):
         else:
             graph_in_features = graph_visual_in_features
 
-        graph_out_features = self.graph_encoder(graph_in_features)
+        graph_out_features = self.graph_encoder(graph_in_features, lang_features)
 
         if self.language_fusion in ['after', 'both']:
             final_features = torch.cat([graph_out_features, lang_features_expanded], dim=-1)
@@ -148,7 +149,8 @@ def instantiate_referit3d_net(args: argparse.Namespace, vocab: Vocabulary, n_obj
         if args.language_fusion in ['after', 'both', 'all']:
             obj_lang_clf_in_dim += lang_out_dim
 
-        graph_encoder = DGCNN(initial_dim=graph_in_dim,
+        graph_encoder = ReasonAwareDGCNN(initial_dim=graph_in_dim,
+                                         lang_dim=lang_out_dim,
                               out_dim=args.graph_out_dim,
                               k_neighbors=args.knn,
                               intermediate_feat_dim=args.dgcnn_intermediate_feat_dim,
