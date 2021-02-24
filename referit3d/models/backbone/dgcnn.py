@@ -116,7 +116,7 @@ class ReasonAwareDGCNN(nn.Module):
 
     def __init__(self, initial_dim, lang_dim, out_dim, k_neighbors,
                  intermediate_feat_dim=[64, 64, 128, 256], subtract_from_self=True):
-        super(DGCNN, self).__init__()
+        super().__init__()
         print('Building DGCNN will have {} graph convolutions'.format(len(intermediate_feat_dim)))
         self.k = k_neighbors
         self.layers = nn.ModuleList()
