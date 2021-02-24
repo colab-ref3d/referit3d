@@ -161,7 +161,7 @@ def make_data_loaders(dist_mgr, args, referit_data, vocab, class_to_idx, scans, 
                                    class_to_idx=class_to_idx,
                                    object_transformation=object_transformation,
                                    visualization=args.mode == 'evaluate',
-                                   max_same_class_distractors=args.max_same_class_distractors,
+                                   max_same_class_distractors=args.max_same_class_distractors if is_train else -1,
                                    )
 
         seed = None
