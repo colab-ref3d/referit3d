@@ -164,7 +164,7 @@ class ReasonAwareDGCNN(nn.Module):
             lang_attn = torch.tanh(lang_enc(lang))
             graph_attn = torch.tanh(graph_enc(torch.mean(x, [obj_dim, 3])))
             dim_attn = lang_attn * graph_attn
-            dim_attn = attn_out(dim_attn)
+            dim_attn = torch.sigmoid(attn_out(dim_attn))
             x = x * dim_attn.unsqueeze(obj_dim).unsqueeze(3)
             x = x.max(dim=-1)[0]
             intermediate_features.append(x)
