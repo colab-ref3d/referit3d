@@ -47,7 +47,7 @@ def single_epoch_train(model, data_loader, criteria, optimizer, device, pad_idx,
 
     # Set the model in training mode
     model.train()
-    np.random.seed()  # call this to change the sampling of the point-clouds
+    # np.random.seed()  # call this to change the sampling of the point-clouds
     batch_keys = make_batch_keys(args)
 
     for batch in tqdm.tqdm(data_loader):
@@ -153,10 +153,10 @@ def evaluate_on_dataset(model, data_loader, criteria, device, pad_idx, args, ran
     # Set the model in training mode
     model.eval()
 
-    if randomize:
-        np.random.seed()  # call this to change the sampling of the point-clouds #TODO-A talk about it.
-    else:
-        np.random.seed(args.random_seed)
+    # if randomize:
+    #     np.random.seed()  # call this to change the sampling of the point-clouds #TODO-A talk about it.
+    # else:
+    #     np.random.seed(args.random_seed)
 
     batch_keys = make_batch_keys(args)
 
@@ -288,7 +288,7 @@ def save_predictions_for_visualization(model, data_loader, device, channel_last,
     res_list = []
 
     # Fix the test random seed
-    np.random.seed(seed)
+    # np.random.seed(seed)
 
     for batch in data_loader:
         # Move the batch to gpu

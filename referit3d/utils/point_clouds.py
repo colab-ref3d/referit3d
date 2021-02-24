@@ -39,15 +39,15 @@ def center_in_unit_sphere(pc, in_place=True):
 
 
 def uniform_sample(points, n_samples, random_seed=None):
-    if random_seed is not None:
-        np.random.seed(random_seed)
+    # if random_seed is not None:
+    #     np.random.seed(random_seed)  # why should I reset the seed???
 
     replace = False
     if n_samples > len(points):
         replace = True
     idx = np.random.choice(len(points), n_samples, replace=replace)
 
-    if random_seed is not None:
-        np.random.seed(None)
+    # if random_seed is not None:
+    #     np.random.seed(None)
 
     return points[idx]

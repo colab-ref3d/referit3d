@@ -29,8 +29,8 @@ def make_pretrained_embedding(vocab, pretrained_vectors, freeze=True, sigma=1, r
     n_words = len(vocab)
     weights = np.zeros((n_words, emb_dim), dtype=emb_dtype)
 
-    if random_seed is not None:
-        np.random.seed(random_seed)
+    # if random_seed is not None:
+    #     np.random.seed(random_seed) # ?
 
     for word, idx in vocab.word2idx.items():
         if word in pretrained_vectors:

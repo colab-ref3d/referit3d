@@ -31,7 +31,7 @@ def random_alphanumeric(n_chars):
     return res
 
 
-def seed_training_code(manual_seed, strict=False):
+def seed_training_code(manual_seed, strict=True):
     """Control pseudo-randomness for reproducibility.
     :param manual_seed: (int) random-seed
     :param strict: (boolean) if True, cudnn operates in a deterministic manner
