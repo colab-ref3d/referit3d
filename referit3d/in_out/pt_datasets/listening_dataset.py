@@ -158,10 +158,6 @@ def make_data_loaders(args, referit_data, vocab, class_to_idx, scans, mean_rgb):
                                    object_transformation=object_transformation,
                                    visualization=args.mode == 'evaluate')
 
-        seed = None
-        if split == 'test':
-            seed = args.random_seed
-
         data_loaders[split] = dataset_to_dataloader(dataset, split, args.batch_size, n_workers, seed=seed)
 
     return data_loaders

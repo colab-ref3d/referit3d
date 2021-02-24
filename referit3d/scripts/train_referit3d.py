@@ -50,6 +50,7 @@ if __name__ == '__main__':
 
     # Parse arguments
     args = parse_arguments()
+    seed_training_code(args.random_seed)
 
     # Read the scan related information
     all_scans_in_dict, scans_split, class_to_idx = load_scan_related_data(args.scannet_file)
@@ -64,9 +65,7 @@ if __name__ == '__main__':
 
     # Prepare GPU environment
     set_gpu_to_zero_position(args.gpu)  # Pnet++ seems to work only at "gpu:0"
-    torch.backends.cudnn.benchmark = True
     device = torch.device('cuda')
-    seed_training_code(args.random_seed)
 
     # Losses:
     criteria = dict()

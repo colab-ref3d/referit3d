@@ -31,7 +31,6 @@ def dataset_to_dataloader(dataset, split, batch_size, n_workers, pin_memory=Fals
 
     shuffle = split == 'train'
 
-    worker_init_fn = lambda x: np.random.seed(seed)
     if split == 'test':
         if type(seed) is not int:
             warnings.warn('Test split is not seeded in a deterministic manner.')
@@ -42,7 +41,8 @@ def dataset_to_dataloader(dataset, split, batch_size, n_workers, pin_memory=Fals
                              shuffle=shuffle,
                              drop_last=drop_last,
                              pin_memory=pin_memory,
-                             worker_init_fn=worker_init_fn)
+                             # worker_init_fn=worker_init_fn
+                             )
     return data_loader
 
 
