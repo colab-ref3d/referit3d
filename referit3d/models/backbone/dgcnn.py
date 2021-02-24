@@ -159,9 +159,9 @@ class ReasonAwareDGCNN(nn.Module):
             x = get_graph_feature(x, k=self.k, subtract=self.subtract_from_self, idx=spatial_knn)
             x = layer(x)
             lang_attn = torch.tanh(lang_enc(lang))
-            graph_attn = torch.tanh(graph_enc(torch.mean(x, obj_dim)))
+            graph_attn = torch.tanh(graph_enc(torch.mean(x, [obj_dim, 3])))
             dim_attn = lang_attn * graph_attn
-            x = x * dim_attn.unsqueeze(obj_dim)
+            x = x * dim_attn.unsqueeze(obj_dim).unsqueeze(3)
             x = x.max(dim=-1)[0]
             intermediate_features.append(x)
 
