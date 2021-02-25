@@ -123,6 +123,13 @@ class NLDGCNN(nn.Module):
         self.layers = nn.ModuleList()
         self.subtract_from_self = subtract_from_self
 
+        self.lang_map = nn.ModuleList(
+            nn.Linear(initial_dim, initial_dim * 2) for fdim in intermediate_feat_dim
+        )
+        self.graph_map = nn.ModuleList(
+            nn.Linear(initial_dim * 2, initial_dim * 2) for fdim in intermediate_feat_dim
+        )
+
         for fdim in intermediate_feat_dim:
             # Each time we multiply  by 2, since we apply a convolution to the concat signal of [x, knn(x)]
             # i.e., we double the dimensions.
@@ -133,12 +140,6 @@ class NLDGCNN(nn.Module):
             initial_dim = fdim
             self.layers.append(layer)
 
-        self.lang_map = nn.ModuleList(
-            nn.Linear(initial_dim, initial_dim * 2) for fdim in intermediate_feat_dim
-        )
-        self.graph_map = nn.ModuleList(
-            nn.Linear(initial_dim * 2, initial_dim * 2) for fdim in intermediate_feat_dim
-        )
 
         self.final_conv = nn.Sequential(nn.Conv1d(sum(intermediate_feat_dim), out_dim, kernel_size=1, bias=False),
                                         nn.BatchNorm1d(out_dim),
