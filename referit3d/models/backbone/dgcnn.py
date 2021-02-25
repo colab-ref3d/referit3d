@@ -124,10 +124,10 @@ class NLDGCNN(nn.Module):
         self.subtract_from_self = subtract_from_self
 
         self.lang_map = nn.ModuleList(
-            nn.Linear(initial_dim, initial_dim * 2) for fdim in intermediate_feat_dim
+            nn.Linear(out_dim, fdim * 2) for fdim in [initial_dim] + intermediate_feat_dim[:-1]
         )
         self.graph_map = nn.ModuleList(
-            nn.Linear(initial_dim * 2, initial_dim * 2) for fdim in intermediate_feat_dim
+            nn.Linear(fdim * 2, fdim * 2) for fdim in [initial_dim] + intermediate_feat_dim[:-1]
         )
 
         for fdim in intermediate_feat_dim:
