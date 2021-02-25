@@ -84,7 +84,23 @@ class ReferIt3DNet(nn.Module):
         else:
             graph_in_features = graph_visual_in_features
 
-        graph_out_features = self.graph_encoder(graph_in_features)
+        graph_out_features, knn_list = self.graph_encoder(graph_in_features)
+
+        if True:
+            import json
+            with open('knn_stat.json', 'r') as f:
+                neighbour_dict = json.load(f)
+            batch_size = knn_list[0].size(0)
+            for layer_num, layer in enumerate(knn_list):
+                for i in range(batch_size):
+                    cls_labels = batch['class_labels'][i].cpu().numpy().tolist()
+                    scene = layer[i]
+                    obj_num = batch['context_size'][i].cpu().item()
+                    for obj in range(obj_num):
+                        stat = {'src': cls_labels[obj], 'dst': scene[obj].cpu().numpy().tolist()}
+                        neighbour_dict[str(layer_num)].append(stat)
+            with open('knn_stat.json', 'w') as f:
+                json.dump(neighbour_dict, f)
 
         if self.language_fusion in ['after', 'both']:
             final_features = torch.cat([graph_out_features, lang_features_expanded], dim=-1)

@@ -39,6 +39,7 @@ def get_graph_feature(x, k=20, idx=None, subtract=True):
     else:
         k = idx.shape[-1]
 
+    idx_original = idx
     idx_base = torch.arange(0, batch_size, device=device).view(-1, 1, 1) * num_points
     idx = idx + idx_base
     idx = idx.view(-1)
@@ -57,7 +58,7 @@ def get_graph_feature(x, k=20, idx=None, subtract=True):
         interaction = feature
 
     feature = torch.cat((interaction, x), dim=3).permute(0, 3, 1, 2).contiguous()
-    return feature
+    return feature, idx_original
 
 
 class DGCNN(nn.Module):
@@ -96,8 +97,10 @@ class DGCNN(nn.Module):
             x = x.transpose(2, 1)  # feat-dim first, then objects
 
         intermediate_features = []
-        for layer in self.layers:
-            x = get_graph_feature(x, k=self.k, subtract=self.subtract_from_self, idx=spatial_knn)
+        knn_list = list()
+        for i, layer in enumerate(self.layers):
+            x, idx = get_graph_feature(x, k=self.k, subtract=self.subtract_from_self, idx=spatial_knn)
+            knn_list.append(idx)
             x = layer(x)
             x = x.max(dim=-1)[0]
             intermediate_features.append(x)
@@ -107,4 +110,4 @@ class DGCNN(nn.Module):
 
         if transpose_input_output:
             x = x.transpose(2, 1)
-        return x
+        return x, knn_list

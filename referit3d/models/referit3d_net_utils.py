@@ -349,6 +349,16 @@ def cls_pred_stats(logits, gt_labels, ignore_label):
     gt_labels = gt_labels[valid_indices]
 
     correct_guessed = gt_labels == predictions
+    if False:
+        gt_list = gt_labels.cpu().numpy().tolist()
+        pred_list = predictions.cpu().numpy().tolist()
+        import json
+        with open('classify.json', 'r') as f:
+            old_list = json.load(f)
+        for i in range(len(gt_list)):
+            old_list.append((gt_list[i], pred_list[i]))
+        with open('classify.json', 'w') as f:
+            json.dump(old_list, f)
     assert (type(correct_guessed) == torch.Tensor)
 
     found_samples = gt_labels[correct_guessed]
