@@ -157,7 +157,7 @@ class NLDGCNN(nn.Module):
         intermediate_features = []
         for layer, lang_enc, graph_enc in zip(self.layers, self.lang_map, self.graph_map):
             x = get_graph_feature(x, k=self.k, subtract=self.subtract_from_self, idx=spatial_knn)
-            x_attn = graph_enc(x.transpose(0, 2, 3, 1)) # N * Nobj * k * 2dim
+            x_attn = graph_enc(x.permute(0, 2, 3, 1)) # N * Nobj * k * 2dim
             lang_attn = lang_enc(lang).unsqueeze(1).unsqueeze(-1) # N * 1 * 2dim * 1
             x_attn = (x_attn @ lang_attn).squeeze(-1) # N * Nobj * k
             x_attn = torch.softmax(x_attn, -1).unsqueeze(1) # N * 1 * Nobj * k
