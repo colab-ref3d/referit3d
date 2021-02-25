@@ -108,3 +108,67 @@ class DGCNN(nn.Module):
         if transpose_input_output:
             x = x.transpose(2, 1)
         return x
+
+
+
+class NLDGCNN(nn.Module):
+    """ The basic structure of DGCNN with a more flexibility to change (easily) the meta-parameters, e.g. depth.
+    """
+
+    def __init__(self, initial_dim, out_dim, k_neighbors,
+                 intermediate_feat_dim=[64, 64, 128, 256], subtract_from_self=True):
+        super().__init__()
+        print('Building DGCNN will have {} graph convolutions'.format(len(intermediate_feat_dim)))
+        self.k = k_neighbors
+        self.layers = nn.ModuleList()
+        self.subtract_from_self = subtract_from_self
+
+        for fdim in intermediate_feat_dim:
+            # Each time we multiply  by 2, since we apply a convolution to the concat signal of [x, knn(x)]
+            # i.e., we double the dimensions.
+            layer = nn.Sequential(nn.Conv2d(initial_dim * 2, fdim, kernel_size=1, bias=False),
+                                  nn.BatchNorm2d(fdim),
+                                  nn.LeakyReLU(negative_slope=0.2))
+
+            initial_dim = fdim
+            self.layers.append(layer)
+
+        self.lang_map = nn.ModuleList(
+            nn.Linear(initial_dim, initial_dim * 2) for fdim in intermediate_feat_dim
+        )
+        self.graph_map = nn.ModuleList(
+            nn.Linear(initial_dim * 2, initial_dim * 2) for fdim in intermediate_feat_dim
+        )
+
+        self.final_conv = nn.Sequential(nn.Conv1d(sum(intermediate_feat_dim), out_dim, kernel_size=1, bias=False),
+                                        nn.BatchNorm1d(out_dim),
+                                        nn.LeakyReLU(negative_slope=0.2))
+
+
+    def forward(self, x, lang, transpose_input_output=True, spatial_knn=None):
+        """ Feed forward.
+        :param x: Tensor, [B x Num-objects x Feat-Dim], if transpose_input_output is True else the dims are
+            [B x Feat-Dim x Num-objects]
+        :return: the result of forwarding x to DGCN
+        """
+        if transpose_input_output:
+            x = x.transpose(2, 1)  # feat-dim first, then objects
+
+        intermediate_features = []
+        for layer, lang_enc, graph_enc in zip(self.layers, self.lang_map, self.graph_map):
+            x = get_graph_feature(x, k=self.k, subtract=self.subtract_from_self, idx=spatial_knn)
+            x_attn = graph_enc(x.transpose(0, 2, 3, 1)) # N * Nobj * k * 2dim
+            lang_attn = lang_enc(lang).unsqueeze(1).unsqueeze(-1) # N * 1 * 2dim * 1
+            x_attn = (x_attn @ lang_attn).squeeze(-1) # N * Nobj * k
+            x_attn = torch.softmax(x_attn, -1).unsqueeze(1) # N * 1 * Nobj * k
+            x = x * x_attn
+            x = layer(x) # N, fdim, Nobj, k
+            x = x.max(dim=-1)[0]
+            intermediate_features.append(x)
+
+        x = torch.cat(intermediate_features, dim=1)
+        x = self.final_conv(x)
+
+        if transpose_input_output:
+            x = x.transpose(2, 1)
+        return x
