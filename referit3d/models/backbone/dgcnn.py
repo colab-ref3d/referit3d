@@ -133,13 +133,17 @@ class ReasonAwareDGCNN(nn.Module):
             self.layers.append(layer)
 
         self.lang_attn_layers = nn.ModuleList(
-            nn.Linear(lang_dim, fdim // attention_inner_squeeze_factor) for fdim in intermediate_feat_dim
+            nn.Linear(lang_dim, fdim) for fdim in intermediate_feat_dim
         )
         self.graph_attn_layers = nn.ModuleList(
-            nn.Linear(fdim, fdim // attention_inner_squeeze_factor) for fdim in intermediate_feat_dim
+            nn.Linear(fdim, fdim) for fdim in intermediate_feat_dim
         )
         self.attn_out_layers = nn.ModuleList(
-            nn.Linear(fdim // attention_inner_squeeze_factor, fdim) for fdim in intermediate_feat_dim
+            nn.Sequential(
+                nn.Linear(fdim, fdim // attention_inner_squeeze_factor),
+                nn.ReLU(inplace=True),
+                nn.Linear(fdim // attention_inner_squeeze_factor, fdim),
+            ) for fdim in intermediate_feat_dim
         )
 
         self.final_conv = nn.Sequential(nn.Conv1d(sum(intermediate_feat_dim), out_dim, kernel_size=1, bias=False),
