@@ -134,10 +134,10 @@ def compute_losses(batch, res, criterion_dict, args):
         with torch.no_grad():
             class_logits = res['class_logits'].detach() # N nobj C
             n, nobj, c = class_logits.shape
-            target_pos = batch['target_pos'].reshape(n, nobj, 1) # N obj 1
-            target_msk = torch.zeros_like(class_logits)
-            target_msk.scatter_(2, target_pos, 1) # N obj c one-hot
-            target_logits = (class_logits * target_msk).sum(1) # N C
+            target_pos = batch['target_pos'] # N 1
+            target_msk = torch.zeros_like(target_pos).repeat(1, nobj)
+            target_msk.scatter_(1, target_pos, 1) # N obj one-hot
+            target_logits = (class_logits * target_msk.unsqueeze(-1)).sum(1) # N C
             target_logits = torch.softmax(target_logits, -1)
 
         lang_logits = res['lang_logits'] # N C
