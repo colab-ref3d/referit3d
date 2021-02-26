@@ -59,10 +59,17 @@ def get_graph_feature(x, k=20, idx=None, subtract=True):
     feature = torch.cat((interaction, x), dim=3).permute(0, 3, 1, 2).contiguous()
     return feature
 
-def get_graph_feature_nl(x, lang, rel_enc, lang_rel_enc):
+def get_graph_feature_nl(x, lang, x_enc, lang_enc, rel_enc, lang_rel_enc):
     # x: N, ndim, nobj
     # lang: N, ndim
     x = x.transpose(1, 2) # N, nobj, ndim
+
+    x_attn = x_enc(x)
+    lang_attn = lang_enc(lang).unsqueeze(-1) # N, ndim, 1
+    x_attn = x_attn @ lang_attn # N nobj 1
+    x_attn = torch.sigmoid(x_attn).unsqueeze(-1) # N nobj 1 1
+    x_attn = ((x_attn * x_attn) ** 0.5).transpose(1, 2) # N nobj nobj 1
+
     x_expand = x.unsqueeze(2)
     x_expand_t = x_expand.transpose(1, 2) # N 1 nobj ndim
     x_sub = x_expand - x_expand_t # N nobj nobj ndim
@@ -70,7 +77,7 @@ def get_graph_feature_nl(x, lang, rel_enc, lang_rel_enc):
     lang_rel_attn = lang_rel_enc(lang).unsqueeze(1).unsqueeze(-1) # N 1 ndim 1
     rel_attn = rel_attn @ lang_rel_attn # N nobj nobj 1
     rel_attn = torch.softmax(rel_attn, 1)
-    return torch.cat((x_sub * rel_attn, x.unsqueeze(2).repeat(1, 1, x.shape[1], 1)), 3).permute(0, 3, 1, 2)
+    return torch.cat((x_sub * rel_attn * x_attn, x.unsqueeze(2).repeat(1, 1, x.shape[1], 1)), 3).permute(0, 3, 1, 2)
 
 
 class DGCNN(nn.Module):
@@ -139,7 +146,17 @@ class NLDGCNN(nn.Module):
         self.lang_map = nn.ModuleList(
             nn.Linear(out_dim, fdim) for fdim in [initial_dim] + intermediate_feat_dim[:-1]
         )
+
+
+        self.lang_rel_map = nn.ModuleList(
+            nn.Linear(out_dim, fdim) for fdim in [initial_dim] + intermediate_feat_dim[:-1]
+        )
+
         self.graph_map = nn.ModuleList(
+            nn.Linear(fdim, fdim) for fdim in [initial_dim] + intermediate_feat_dim[:-1]
+        )
+
+        self.rel_map = nn.ModuleList(
             nn.Linear(fdim, fdim) for fdim in [initial_dim] + intermediate_feat_dim[:-1]
         )
 
@@ -169,8 +186,14 @@ class NLDGCNN(nn.Module):
             x = x.transpose(2, 1)  # feat-dim first, then objects
 
         intermediate_features = []
-        for layer, lang_enc, graph_enc in zip(self.layers, self.lang_map, self.graph_map):
-            x = get_graph_feature_nl(x, lang, rel_enc=graph_enc, lang_rel_enc=lang_enc)
+        for layer, lang_enc, graph_enc, rel_enc, lang_rel_enc in \
+                zip(self.layers,
+                    self.lang_map,
+                    self.graph_map,
+                    self.rel_map,
+                    self.lang_rel_map,
+                ):
+            x = get_graph_feature_nl(x, lang, graph_enc, lang_enc, rel_enc, lang_rel_enc)
             # x_attn = graph_enc(x.permute(0, 2, 3, 1)) # N * Nobj * k * 2dim
             # lang_attn = lang_enc(lang).unsqueeze(1).unsqueeze(-1) # N * 1 * 2dim * 1
             # x_attn = (x_attn @ lang_attn).squeeze(-1) # N * Nobj * k
