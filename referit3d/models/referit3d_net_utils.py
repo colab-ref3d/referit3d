@@ -131,9 +131,21 @@ def compute_losses(batch, res, criterion_dict, args):
         total_loss += obj_clf_loss * args.obj_cls_alpha
 
     if args.lang_cls_alpha > 0:
-        criterion = criterion_dict['lang_logits']
-        lang_clf_loss = criterion(res['lang_logits'], batch['target_class'])
-        total_loss += lang_clf_loss * args.lang_cls_alpha
+        with torch.no_grad():
+            class_logits = res['class_logits'].detach() # N nobj C
+            n, nobj, c = class_logits.shape
+            target_pos = batch['target_pos'].reshape(n, nobj, 1) # N obj 1
+            target_msk = torch.zeros_like(class_logits)
+            target_msk.scatter_(2, target_pos, 1) # N obj c one-hot
+            target_logits = (class_logits * target_msk).sum(1) # N C
+            target_logits = torch.softmax(target_logits, -1)
+
+        lang_logits = res['lang_logits'] # N C
+        lang_logits = torch.log_softmax(lang_logits, -1)
+        ce = -lang_logits * target_logits
+        ce = ce.sum(-1)
+        ce = ce.mean()
+        total_loss += ce * args.lang_cls_alpha
 
     return {'total_loss': total_loss, 'referential_loss': referential_loss,
             'obj_clf_loss': obj_clf_loss, 'lang_clf_loss': lang_clf_loss}
