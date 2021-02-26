@@ -64,7 +64,7 @@ def get_graph_feature_nl(x, lang, rel_enc, lang_rel_enc):
     # lang: N, ndim
     x = x.transpose(1, 2) # N, nobj, ndim
     x_expand = x.unsqueeze(2)
-    x_expand_t = x.transpose(1, 2) # N 1 nobj ndim
+    x_expand_t = x_expand.transpose(1, 2) # N 1 nobj ndim
     x_sub = x_expand - x_expand_t # N nobj nobj ndim
     rel_attn = rel_enc(x_sub)
     lang_rel_attn = lang_rel_enc(lang).unsqueeze(1).unsqueeze(-1) # N 1 ndim 1
