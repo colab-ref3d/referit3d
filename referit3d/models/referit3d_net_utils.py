@@ -131,8 +131,12 @@ def compute_losses(batch, res, criterion_dict, args):
         total_loss += obj_clf_loss * args.obj_cls_alpha
 
     if args.lang_cls_alpha > 0:
-        criterion = criterion_dict['lang_logits']
-        lang_clf_loss = criterion(res['lang_logits'], batch['target_class'])
+        indices = batch['target_pos'].repeat((524, 1)).permute((1, 0)).unsqueeze(1)
+        target_logits = res['class_logits'].gather(1, indices).squeeze(1)
+        target_prob = torch.softmax(target_logits, 1)
+        lang_clf_prob = torch.softmax(res['lang_logits'], 1)
+        lang_clf_loss = torch.sum(-target_prob * torch.log(lang_clf_prob), dim=1)
+        lang_clf_loss = torch.mean(lang_clf_loss)
         total_loss += lang_clf_loss * args.lang_cls_alpha
 
     return {'total_loss': total_loss, 'referential_loss': referential_loss,
