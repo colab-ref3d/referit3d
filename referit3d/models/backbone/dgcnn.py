@@ -59,6 +59,19 @@ def get_graph_feature(x, k=20, idx=None, subtract=True):
     feature = torch.cat((interaction, x), dim=3).permute(0, 3, 1, 2).contiguous()
     return feature
 
+def get_graph_feature_nl(x, lang, rel_enc, lang_rel_enc):
+    # x: N, ndim, nobj
+    # lang: N, ndim
+    x = x.transpose(1, 2) # N, nobj, ndim
+    x_expand = x.unsqueeze(2)
+    x_expand_t = x.transpose(1, 2) # N 1 nobj ndim
+    x_sub = x_expand - x_expand_t # N nobj nobj ndim
+    rel_attn = rel_enc(x_sub)
+    lang_rel_attn = lang_rel_enc(lang).unsqueeze(1).unsqueeze(-1) # N 1 ndim 1
+    rel_attn = rel_attn @ lang_rel_attn # N nobj nobj 1
+    rel_attn = torch.softmax(rel_attn, 1)
+    return torch.cat((x_sub * rel_attn, x.unsqueeze(2).repeat(1, 1, x.shape[1], 1)), 3).permute(0, 3, 1, 2)
+
 
 class DGCNN(nn.Module):
     """ The basic structure of DGCNN with a more flexibility to change (easily) the meta-parameters, e.g. depth.
@@ -124,10 +137,10 @@ class NLDGCNN(nn.Module):
         self.subtract_from_self = subtract_from_self
 
         self.lang_map = nn.ModuleList(
-            nn.Linear(out_dim, fdim * 2) for fdim in [initial_dim] + intermediate_feat_dim[:-1]
+            nn.Linear(out_dim, fdim) for fdim in [initial_dim] + intermediate_feat_dim[:-1]
         )
         self.graph_map = nn.ModuleList(
-            nn.Linear(fdim * 2, fdim * 2) for fdim in [initial_dim] + intermediate_feat_dim[:-1]
+            nn.Linear(fdim, fdim) for fdim in [initial_dim] + intermediate_feat_dim[:-1]
         )
 
         for fdim in intermediate_feat_dim:
@@ -157,12 +170,12 @@ class NLDGCNN(nn.Module):
 
         intermediate_features = []
         for layer, lang_enc, graph_enc in zip(self.layers, self.lang_map, self.graph_map):
-            x = get_graph_feature(x, k=self.k, subtract=self.subtract_from_self, idx=spatial_knn)
-            x_attn = graph_enc(x.permute(0, 2, 3, 1)) # N * Nobj * k * 2dim
-            lang_attn = lang_enc(lang).unsqueeze(1).unsqueeze(-1) # N * 1 * 2dim * 1
-            x_attn = (x_attn @ lang_attn).squeeze(-1) # N * Nobj * k
-            x_attn = torch.softmax(x_attn, -1).unsqueeze(1) # N * 1 * Nobj * k
-            x = x * x_attn
+            x = get_graph_feature_nl(x, lang, rel_enc=graph_enc, lang_rel_enc=lang_enc)
+            # x_attn = graph_enc(x.permute(0, 2, 3, 1)) # N * Nobj * k * 2dim
+            # lang_attn = lang_enc(lang).unsqueeze(1).unsqueeze(-1) # N * 1 * 2dim * 1
+            # x_attn = (x_attn @ lang_attn).squeeze(-1) # N * Nobj * k
+            # x_attn = torch.softmax(x_attn, -1).unsqueeze(1) # N * 1 * Nobj * k
+            # x = x * x_attn
             x = layer(x) # N, fdim, Nobj, k
             x = x.max(dim=-1)[0]
             intermediate_features.append(x)
