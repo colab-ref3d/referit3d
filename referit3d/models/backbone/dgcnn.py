@@ -67,8 +67,7 @@ def get_graph_feature_nl(x, lang, x_enc, lang_enc, rel_enc, lang_rel_enc):
     x_attn = x_enc(x)
     lang_attn = lang_enc(lang).unsqueeze(-1) # N, ndim, 1
     x_attn = x_attn @ lang_attn # N nobj 1
-    x_attn = torch.sigmoid(x_attn).unsqueeze(-1) # N nobj 1 1
-    x_attn = ((x_attn * x_attn) ** 0.5).transpose(1, 2) # N nobj nobj 1
+    x_attn = torch.softmax(x_attn, 1).unsqueeze(-1) # N nobj 1 1
 
     x_expand = x.unsqueeze(2)
     x_expand_t = x_expand.transpose(1, 2) # N 1 nobj ndim
