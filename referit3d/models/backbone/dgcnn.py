@@ -72,7 +72,8 @@ def get_graph_feature_nl(x, lang, x_enc, lang_enc, rel_enc, lang_rel_enc):
     x_expand = x.unsqueeze(2)
     x_expand_t = x_expand.transpose(1, 2) # N 1 nobj ndim
     x_sub = x_expand - x_expand_t # N nobj nobj ndim
-    rel_attn = rel_enc(x_sub)
+    nobj = x_expand.shape[1]
+    rel_attn = rel_enc(torch.cat((x_sub, x_expand_t.repeat(1, nobj, 1, 1)), -1))
     lang_rel_attn = lang_rel_enc(lang).unsqueeze(1).unsqueeze(-1) # N 1 ndim 1
     rel_attn = rel_attn @ lang_rel_attn # N nobj nobj 1
     rel_attn = torch.softmax(rel_attn, 1)
@@ -156,7 +157,7 @@ class NLDGCNN(nn.Module):
         )
 
         self.rel_map = nn.ModuleList(
-            nn.Linear(fdim, fdim) for fdim in [initial_dim] + intermediate_feat_dim[:-1]
+            nn.Linear(fdim * 2, fdim) for fdim in [initial_dim] + intermediate_feat_dim[:-1]
         )
 
         for fdim in intermediate_feat_dim:

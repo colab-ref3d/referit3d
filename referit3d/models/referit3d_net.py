@@ -137,7 +137,7 @@ def instantiate_referit3d_net(args: argparse.Namespace, vocab: Vocabulary, n_obj
 
     if args.model.startswith('referIt3DNet'):
         # we will use a DGCNN.
-        print('Instantiating a classic NLDGCNN')
+        print('Instantiating a KNN NLDGCNN')
 
         graph_in_dim = geo_out_dim
         obj_lang_clf_in_dim = args.graph_out_dim
