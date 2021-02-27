@@ -130,7 +130,7 @@ def compute_losses(batch, res, criterion_dict, args):
         # obj_clf_loss = criterion(res['class_logits'].transpose(2, 1), batch['class_labels'])
 
         obj_logits = torch.log_softmax(res['class_logits'], -1)
-        obj_labels = batch['class_labels'].unsqueeze(1) # N nobj
+        obj_labels = batch['class_labels'].unsqueeze(-1) # N nobj
         obj_onehot = torch.zeros_like(obj_logits)
         obj_onehot = obj_onehot.scatter(2, obj_labels, 1)
         eps = 0.1
