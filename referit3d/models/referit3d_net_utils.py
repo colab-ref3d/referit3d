@@ -134,7 +134,7 @@ def compute_losses(batch, res, criterion_dict, args):
         obj_onehot = torch.zeros_like(obj_logits)
         obj_onehot = obj_onehot.scatter(2, obj_labels, 1)
         eps = 0.1
-        obj_onehot[obj_onehot == 1] = 1 - 2 * eps
+        obj_onehot *= 1 - 2 * eps
         obj_onehot += eps
         obj_clf_loss = -obj_onehot * obj_logits
         obj_clf_loss = torch.sum(obj_clf_loss, -1)
