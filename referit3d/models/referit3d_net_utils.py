@@ -126,9 +126,22 @@ def compute_losses(batch, res, criterion_dict, args):
     obj_clf_loss = lang_clf_loss = 0
 
     if args.obj_cls_alpha > 0:
-        criterion = criterion_dict['class_logits']
-        obj_clf_loss = criterion(res['class_logits'].transpose(2, 1), batch['class_labels'])
+        # criterion = criterion_dict['class_logits']
+        # obj_clf_loss = criterion(res['class_logits'].transpose(2, 1), batch['class_labels'])
+
+        obj_logits = torch.log_softmax(res['class_logits'], -1)
+        obj_labels = batch['class_labels'].unsqueeze(1) # N nobj
+        obj_onehot = torch.zeros_like(obj_logits)
+        obj_onehot = obj_onehot.scatter(2, obj_labels, 1)
+        eps = 0.1
+        obj_onehot[obj_onehot == 1] = 1 - 2 * eps
+        obj_onehot += eps
+        obj_clf_loss = -obj_onehot * obj_logits
+        obj_clf_loss = torch.sum(obj_clf_loss, -1)
+        obj_clf_loss = obj_clf_loss.mean()
+
         total_loss += obj_clf_loss * args.obj_cls_alpha
+
 
     if args.lang_cls_alpha > 0:
         with torch.no_grad():
