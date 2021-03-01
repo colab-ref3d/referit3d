@@ -125,18 +125,36 @@ def compute_losses(batch, res, criterion_dict, args):
     referential_loss = total_loss.item()
     obj_clf_loss = lang_clf_loss = 0
 
+    def ce_from_logits(logits_1, logits_2):
+        prob_1 = torch.softmax(logits_1, dim=-1)
+        prob_2 = torch.softmax(logits_2, dim=-1)
+        loss = torch.sum(-prob_1 * torch.log(prob_2), dim=-1)
+        return loss.mean()
+
     if args.obj_cls_alpha > 0:
-        criterion = criterion_dict['class_logits']
-        obj_clf_loss = criterion(res['class_logits'].transpose(2, 1), batch['class_labels'])
+        eps = 0.1
+        n = res['class_logits'].size()[-1]
+        mask = batch['class_labels'] != 524  # batch x N_obj
+        class_logits = res['class_logits']  # batch x N_obj x N_cls
+        log_preds = F.log_softmax(class_logits, -1)
+        other_loss = -log_preds.sum(-1)
+        other_loss = other_loss.masked_select(mask).mean()
+        nll_loss = F.nll_loss(log_preds.transpose(2, 1), batch['class_labels'], reduction='mean', ignore_index=524)
+        obj_clf_loss = eps * (other_loss / n) + (1 - eps) * nll_loss
+
+        mask = mask.repeat((n, 1, 1)).permute((1, 2, 0))
+        class_logits = class_logits.masked_select(mask)
+        class_logits_2 = res['class_logits_2'].masked_select(mask)
+        class_logits_3 = res['class_logits_3'].masked_select(mask)
+        obj_clf_loss += ce_from_logits(class_logits, class_logits_2)
+        obj_clf_loss += ce_from_logits(class_logits_2, class_logits_3)
         total_loss += obj_clf_loss * args.obj_cls_alpha
 
     if args.lang_cls_alpha > 0:
         indices = batch['target_pos'].repeat((524, 1)).permute((1, 0)).unsqueeze(1)
-        target_logits = res['class_logits'].gather(1, indices).squeeze(1)
-        target_prob = torch.softmax(target_logits, 1)
-        lang_clf_prob = torch.softmax(res['lang_logits'], 1)
-        lang_clf_loss = torch.sum(-target_prob * torch.log(lang_clf_prob), dim=1)
-        lang_clf_loss = torch.mean(lang_clf_loss)
+        target_logits = res['class_logits_3'].gather(1, indices).squeeze(1)
+        lang_logits = res['lang_logits']
+        lang_clf_loss = ce_from_logits(target_logits, lang_logits)
         total_loss += lang_clf_loss * args.lang_cls_alpha
 
     return {'total_loss': total_loss, 'referential_loss': referential_loss,

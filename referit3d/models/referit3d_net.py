@@ -26,6 +26,8 @@ class ReferIt3DNet(nn.Module):
                  graph_encoder,
                  object_language_clf,
                  object_clf=None,
+                 object_clf_2=None,
+                 object_clf_3=None,
                  language_clf=None):
         """
         Parameters have same meaning as in Base3DListener.
@@ -52,6 +54,8 @@ class ReferIt3DNet(nn.Module):
 
         # Classifier heads
         self.object_clf = object_clf
+        self.object_clf_2 = object_clf_2
+        self.object_clf_3 = object_clf_3
         self.language_clf = language_clf
         self.object_language_clf = object_language_clf
 
@@ -66,6 +70,8 @@ class ReferIt3DNet(nn.Module):
         if self.object_clf is not None:
             objects_classifier_features = objects_features
             result['class_logits'] = get_siamese_features(self.object_clf, objects_classifier_features, torch.stack)
+            result['class_logits_2'] = get_siamese_features(self.object_clf_2, objects_classifier_features, torch.stack)
+            result['class_logits_3'] = get_siamese_features(self.object_clf_3, objects_classifier_features, torch.stack)
 
         # Get feature for utterance
         n_objects = batch['objects'].size(1)
@@ -118,9 +124,13 @@ def instantiate_referit3d_net(args: argparse.Namespace, vocab: Vocabulary, n_obj
 
     # Optional, make a bbox encoder
     object_clf = None
+    object_clf_2 = None
+    object_clf_3 = None
     if args.obj_cls_alpha > 0:
         print('Adding an object-classification loss.')
         object_clf = object_decoder_for_clf(geo_out_dim, n_obj_classes)
+        object_clf_2 = object_decoder_for_clf(geo_out_dim, n_obj_classes)
+        object_clf_3 = object_decoder_for_clf(geo_out_dim, n_obj_classes)
 
     language_clf = None
     if args.lang_cls_alpha > 0:
@@ -162,6 +172,8 @@ def instantiate_referit3d_net(args: argparse.Namespace, vocab: Vocabulary, n_obj
             language_encoder=lang_encoder,
             graph_encoder=graph_encoder,
             object_clf=object_clf,
+            object_clf_2=object_clf_2,
+            object_clf_3=object_clf_3,
             language_clf=language_clf,
             object_language_clf=object_language_clf)
     else:
