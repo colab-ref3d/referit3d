@@ -141,12 +141,27 @@ def compute_losses(batch, res, criterion_dict, args):
         other_loss = other_loss.masked_select(mask).mean()
         nll_loss = F.nll_loss(log_preds.transpose(2, 1), batch['class_labels'], reduction='mean', ignore_index=524)
         obj_clf_loss = eps * (other_loss / n) + (1 - eps) * nll_loss
-
-        mask = mask.repeat((n, 1, 1)).permute((1, 2, 0))
-        class_logits = class_logits.masked_select(mask)
-        class_logits_2 = res['class_logits_2'].masked_select(mask)
+        '''
+        obj_logits = torch.log_softmax(res['class_logits'], -1)  # B x N_obj x C
+        obj_labels = batch['class_labels'].unsqueeze(-1)  # B x N_obj x 1
+        pad_msk = obj_labels >= obj_logits.shape[-1]  # find all <pad> B x Nobj x 1
+        obj_labels[pad_msk] = 0  # hack for scatter
+        obj_onehot = torch.zeros_like(obj_logits)  # B x N x C
+        obj_onehot = obj_onehot.scatter(2, obj_labels, 1)
+        obj_onehot *= (1. - pad_msk.float())
+        eps = 0.1
+        n = obj_logits.shape[-1]
+        obj_onehot *= (1 - n / (n-1) * eps)
+        obj_onehot += (eps / (n - 1))
+        obj_clf_loss = -obj_onehot * obj_logits
+        obj_clf_loss = torch.sum(obj_clf_loss, -1)
+        obj_clf_loss = obj_clf_loss.mean()
+        '''
+        # mask = mask.repeat((n, 1, 1)).permute((1, 2, 0))
+        # class_logits = class_logits.masked_select(mask)
+        # class_logits_2 = res['class_logits_2'].masked_select(mask)
         # class_logits_3 = res['class_logits_3'].masked_select(mask)
-        obj_clf_loss += ce_from_logits(class_logits, class_logits_2)
+        obj_clf_loss += ce_from_logits(res['class_logits'], res['class_logits_2'])
         # obj_clf_loss += ce_from_logits(class_logits_2, class_logits_3)
         total_loss += obj_clf_loss * args.obj_cls_alpha
 
