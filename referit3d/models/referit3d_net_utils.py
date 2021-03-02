@@ -131,16 +131,25 @@ def compute_losses(batch, res, criterion_dict, args):
         loss = torch.sum(-prob_1 * torch.log(prob_2), dim=-1)
         return loss.mean()
 
-    if args.obj_cls_alpha > 0:
-        eps = 0.1
-        n = res['class_logits'].size()[-1]
-        mask = batch['class_labels'] != 524  # batch x N_obj
-        class_logits = res['class_logits']  # batch x N_obj x N_cls
-        log_preds = F.log_softmax(class_logits, -1)
-        other_loss = -log_preds.sum(-1)
+    def label_smoothing(obj_logits, obj_labels, eps=0.1):
+        n = obj_logits.size()[-1]
+        mask = obj_labels != 524
+        log_preds = F.log_softmax(obj_logits, -1)
+        other_loss = -log_preds.sum(dim=-1)
         other_loss = other_loss.masked_select(mask).mean()
-        nll_loss = F.nll_loss(log_preds.transpose(2, 1), batch['class_labels'], reduction='mean', ignore_index=524)
-        obj_clf_loss = eps * (other_loss / n) + (1 - eps) * nll_loss
+        nll_loss = F.nll_loss(log_preds.transpose(2, 1), obj_labels, ignore_index=524)
+        return eps * (other_loss / n) + (1 - eps) * nll_loss
+
+    def conf_penalty(obj_logits, obj_labels, beta=0.1):
+        ce = criterion_dict['class_logits']
+        loss = ce(obj_logits.transpose(2, 1), obj_labels)
+        prob = torch.softmax(obj_logits, dim=-1)
+        entropy = (-prob * torch.log(prob)).sum(dim=-1)
+        return loss + entropy.mean() * beta
+
+    if args.obj_cls_alpha > 0:
+        # obj_clf_loss = label_smoothing(res['class_logits'], batch['class_labels'])
+        obj_clf_loss = conf_penalty(res['class_logits'], batch['class_labels'])
         '''
         obj_logits = torch.log_softmax(res['class_logits'], -1)  # B x N_obj x C
         obj_labels = batch['class_labels'].unsqueeze(-1)  # B x N_obj x 1
@@ -161,13 +170,13 @@ def compute_losses(batch, res, criterion_dict, args):
         # class_logits = class_logits.masked_select(mask)
         # class_logits_2 = res['class_logits_2'].masked_select(mask)
         # class_logits_3 = res['class_logits_3'].masked_select(mask)
-        obj_clf_loss += ce_from_logits(res['class_logits'], res['class_logits_2'])
+        # obj_clf_loss += ce_from_logits(res['class_logits'], res['class_logits_2'])
         # obj_clf_loss += ce_from_logits(class_logits_2, class_logits_3)
         total_loss += obj_clf_loss * args.obj_cls_alpha
 
     if args.lang_cls_alpha > 0:
         indices = batch['target_pos'].repeat((524, 1)).permute((1, 0)).unsqueeze(1)
-        target_logits = res['class_logits_2'].gather(1, indices).squeeze(1)
+        target_logits = res['class_logits'].gather(1, indices).squeeze(1)
         lang_logits = res['lang_logits']
         lang_clf_loss = ce_from_logits(target_logits, lang_logits)
         total_loss += lang_clf_loss * args.lang_cls_alpha
