@@ -145,14 +145,14 @@ def compute_losses(batch, res, criterion_dict, args):
         mask = mask.repeat((n, 1, 1)).permute((1, 2, 0))
         class_logits = class_logits.masked_select(mask)
         class_logits_2 = res['class_logits_2'].masked_select(mask)
-        class_logits_3 = res['class_logits_3'].masked_select(mask)
+        # class_logits_3 = res['class_logits_3'].masked_select(mask)
         obj_clf_loss += ce_from_logits(class_logits, class_logits_2)
-        obj_clf_loss += ce_from_logits(class_logits_2, class_logits_3)
+        # obj_clf_loss += ce_from_logits(class_logits_2, class_logits_3)
         total_loss += obj_clf_loss * args.obj_cls_alpha
 
     if args.lang_cls_alpha > 0:
         indices = batch['target_pos'].repeat((524, 1)).permute((1, 0)).unsqueeze(1)
-        target_logits = res['class_logits_3'].gather(1, indices).squeeze(1)
+        target_logits = res['class_logits_2'].gather(1, indices).squeeze(1)
         lang_logits = res['lang_logits']
         lang_clf_loss = ce_from_logits(target_logits, lang_logits)
         total_loss += lang_clf_loss * args.lang_cls_alpha
