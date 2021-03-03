@@ -309,6 +309,9 @@ class OrientedCuboid(object):
     def size(self):
         return np.array([self.lx, self.ly, self.lz])
 
+    def pos(self):
+        return np.array([self.cx, self.cy, self.cz, self.lx, self.ly, self.lz])
+
     def z_faces(self):
         corners = self._corners()
         [_, _, zmin, _, _, zmax] = self._extrema()
