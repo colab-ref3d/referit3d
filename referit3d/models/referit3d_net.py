@@ -79,7 +79,7 @@ class ReferIt3DNet(nn.Module):
 
         # Get feature for utterance
         n_objects = batch['objects'].size(1)
-        lang_features = self.language_encoder(batch['tokens'])
+        lang_features = self.language_encoder(batch['word_vectors'], batch['n_words'])
         lang_features_expanded = torch.unsqueeze(lang_features, -1).expand(-1, -1, n_objects).transpose(
             2, 1)  # B X N_Objects x lang-latent-dim
 
@@ -139,8 +139,7 @@ def instantiate_referit3d_net(args: argparse.Namespace, vocab: Vocabulary, n_obj
         # typically there are less active classes for text, but it does not affect the attained text-clf accuracy.
 
     # make a language encoder
-    lang_encoder = token_encoder(vocab=vocab,
-                                 word_embedding_dim=args.word_embedding_dim,
+    lang_encoder = token_encoder(word_embedding_dim=args.word_embedding_dim,
                                  lstm_n_hidden=lang_out_dim,
                                  word_dropout=args.word_dropout,
                                  random_seed=args.random_seed)

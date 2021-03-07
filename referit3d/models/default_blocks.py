@@ -34,19 +34,15 @@ def single_object_encoder(out_dim: int) -> PointNetPP:
 #
 #  Token Encoder
 #
-def token_encoder(vocab: Vocabulary,
-                  word_embedding_dim: int,
+def token_encoder(word_embedding_dim: int,
                   lstm_n_hidden: int,
                   word_dropout: float,
                   init_c=None, init_h=None, random_seed=None,
-                  feature_type='max',
-                  glove_emb_file: str = '') -> LSTMEncoder:
+                  feature_type='max') -> LSTMEncoder:
     """
     Language Token Encoder.
 
-    @param vocab: The vocabulary created from the dataset (nr3d or sr3d) language tokens
     @param word_embedding_dim: The dimension of each word token embedding
-    @param glove_emb_file: If provided, the glove pretrained embeddings for language word tokens
     @param lstm_n_hidden: The dimension of LSTM hidden state
     @param word_dropout:
     @param init_c:
@@ -54,27 +50,12 @@ def token_encoder(vocab: Vocabulary,
     @param random_seed:
     @param feature_type:
     """
-    if len(glove_emb_file) > 0:
-        print('Using glove pre-trained embeddings.')
-        glove_embedding = load_glove_pretrained_embedding(glove_emb_file, verbose=True)
-        word_embedding = make_pretrained_embedding(vocab, glove_embedding, random_seed=random_seed)
+    word_projection = nn.Sequential(nn.Dropout(word_dropout),
+                                    nn.Linear(300, word_embedding_dim),
+                                    nn.ReLU())
 
-        # word-projection here is a bit deeper, since the glove-embedding is frozen.
-        word_projection = nn.Sequential(nn.Linear(word_embedding_dim, word_embedding_dim),
-                                        nn.ReLU(),
-                                        nn.Dropout(word_dropout),
-                                        nn.Linear(word_embedding_dim, word_embedding_dim),
-                                        nn.ReLU())
-    else:
-        word_embedding = nn.Embedding(len(vocab), word_embedding_dim, padding_idx=vocab.pad)
-        word_projection = nn.Sequential(nn.Dropout(word_dropout),
-                                        nn.Linear(word_embedding_dim, word_embedding_dim),
-                                        nn.ReLU())
-
-    assert vocab.pad == 0 and vocab.eos == 2
-
-    model = LSTMEncoder(n_input=word_embedding_dim, n_hidden=lstm_n_hidden, word_embedding=word_embedding,
-                        init_c=init_c, init_h=init_h, word_transformation=word_projection, eos_symbol=vocab.eos,
+    model = LSTMEncoder(n_input=word_embedding_dim, n_hidden=lstm_n_hidden,
+                        init_c=init_c, init_h=init_h, word_transformation=word_projection,
                         feature_type=feature_type)
     return model
 

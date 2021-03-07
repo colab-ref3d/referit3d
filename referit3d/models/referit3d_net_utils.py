@@ -13,7 +13,7 @@ from ..utils.evaluation import AverageMeter
 
 def make_batch_keys(args, extras=None):
     """depending on the args, different data are used by the listener."""
-    batch_keys = ['objects', 'tokens', 'target_pos']  # all models use these
+    batch_keys = ['objects', 'tokens', 'target_pos', 'word_vectors', 'n_words']  # all models use these
     if extras is not None:
         batch_keys += extras
 

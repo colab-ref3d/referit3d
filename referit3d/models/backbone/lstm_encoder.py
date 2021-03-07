@@ -6,26 +6,22 @@ from torch.nn.utils.rnn import pack_padded_sequence, pad_packed_sequence
 class LSTMEncoder(nn.Module):
     """A feed-forward network that processes discrete tokens via an LSTM."""
 
-    def __init__(self, n_input, n_hidden, word_embedding, word_transformation=None,
-                 bidirectional=False, init_h=None, init_c=None, eos_symbol=None, feature_type='last'):
+    def __init__(self, n_input, n_hidden, word_transformation=None,
+                 bidirectional=False, init_h=None, init_c=None, feature_type='last'):
         """
         @param n_input: (int) input dim of LSTM
         @param n_hidden: (int) hidden dim of LSTM
-        @param word_embedding: (nn.Embedding) vectors representing words
         @param word_transformation: (opt, nn.Module) to apply some transformation on the word
         embeddings before they are consumed by the LSTM.
         @param bidirectional: boolean, whether to use a bi-RNN
         @param init_h: (opt, nn.Module) for initializing LSTM hidden state
         @param init_c: (opt, nn.Module) for initializing LSTM memory
-        @param eos_symbol: (opt, int) integer signifying end of sentence
         @param feature_type: (opt, string) how to process the output of the LSTM,
             valid options = ['last', 'max', 'mean', 'all']
         """
 
         super().__init__()
-        self.word_embedding = word_embedding
         self.n_hidden = n_hidden
-        self.eos = eos_symbol
         self.feature_type = feature_type
 
         # auxiliary (optional) networks
@@ -41,22 +37,18 @@ class LSTMEncoder(nn.Module):
         mult = 2 if rnn.bidirectional else 1
         return rnn.num_layers * rnn.hidden_size * mult
 
-    def __call__(self, tokens, grounding=None, len_of_sequence=None):
+    def __call__(self, w_emb, len_of_sequence, grounding=None):
         """
-        @param tokens:
+        @param w_emb:
         @param grounding: (Tensor, opt)
-        @param len_of_sequence: (Tensor:, opt) singleton tensor of shape (B,) carrying the length of the tokens
+        @param len_of_sequence: (Tensor:) singleton tensor of shape (B,) carrying the length of the tokens
         :return: the encoded by the LSTM tokens
             Note: a) tokens are padded with the <sos> token
         """
-        w_emb = self.word_embedding(tokens[:, 1:]) # skip <sos>
         if self.word_transformation is not None:
             w_emb = self.word_transformation(w_emb)
 
         device = w_emb.device
-
-        if len_of_sequence is None:
-            len_of_sequence = torch.where(tokens == self.eos)[1] - 1  # ignore <sos>
 
         x_packed = pack_padded_sequence(w_emb, len_of_sequence, enforce_sorted=False, batch_first=True)
 
@@ -73,7 +65,7 @@ class LSTMEncoder(nn.Module):
         assert torch.all(dummy.to(device) == len_of_sequence)
 
         if self.feature_type == 'last':
-            batch_size = len(tokens)
+            batch_size = w_emb.shape[0]
             lang_feat = rnn_out[torch.arange(batch_size), len_of_sequence-1]
         elif self.feature_type == 'max':
             lang_feat = rnn_out.max(1).values

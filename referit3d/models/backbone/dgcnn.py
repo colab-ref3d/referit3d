@@ -76,7 +76,8 @@ def get_graph_feature_nl(x, lang, x_enc, lang_enc, rel_enc, lang_rel_enc):
     lang_rel_attn = lang_rel_enc(lang).unsqueeze(1).unsqueeze(-1) # N 1 ndim 1
     rel_attn = rel_attn @ lang_rel_attn # N nobj nobj 1
     rel_attn = torch.softmax(rel_attn, 1)
-    return torch.cat((x_sub * rel_attn * x_attn, x.unsqueeze(2).repeat(1, 1, x.shape[1], 1)), 3).permute(0, 3, 1, 2)
+    return torch.cat((x_sub * rel_attn * x_attn, x.unsqueeze(2).repeat(1, 1, x.shape[1], 1)), 3)\
+        .permute(0, 3, 1, 2).contiguous()
 
 
 class DGCNN(nn.Module):

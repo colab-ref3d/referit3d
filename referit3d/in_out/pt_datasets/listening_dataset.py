@@ -1,4 +1,5 @@
 import numpy as np
+import spacy
 from torch.utils.data import Dataset
 from functools import partial
 from .utils import dataset_to_dataloader, max_io_workers
@@ -25,6 +26,7 @@ class ListeningDataset(Dataset):
         self.class_to_idx = class_to_idx
         self.visualization = visualization
         self.object_transformation = object_transformation
+        self.nlp = spacy.load('en_core_web_md')
 
         if not check_segmented_object_order(scans):
             raise ValueError
@@ -37,9 +39,17 @@ class ListeningDataset(Dataset):
         scan = self.scans[ref['scan_id']]
         target = scan.three_d_objects[ref['target_id']]
         tokens = np.array(self.vocab.encode(ref['tokens'], self.max_seq_len), dtype=np.long)
+        word_vectors = np.stack([elm.vector for elm in self.nlp(ref['utterance'])], axis=0)
+        n_words = word_vectors.shape[0]
+        if n_words >= self.max_seq_len:
+            word_vectors = word_vectors[0:self.max_seq_len, :]
+        else:
+            word_vectors = np.pad(word_vectors, ((0, self.max_seq_len - n_words), (0, 0)),
+                                  'constant', constant_values=0)
+        n_words = min(n_words, self.max_seq_len)
         is_nr3d = ref['dataset'] == 'nr3d'
 
-        return scan, target, tokens, is_nr3d
+        return scan, target, tokens, is_nr3d, word_vectors, n_words
 
     def prepare_distractors(self, scan, target):
         target_label = target.instance_label
@@ -61,7 +71,7 @@ class ListeningDataset(Dataset):
 
     def __getitem__(self, index):
         res = dict()
-        scan, target, tokens, is_nr3d = self.get_reference_data(index)
+        scan, target, tokens, is_nr3d, word_vectors, n_words = self.get_reference_data(index)
 
         # Make a context of distractors
         context = self.prepare_distractors(scan, target)
@@ -95,6 +105,8 @@ class ListeningDataset(Dataset):
         res['target_pos'] = target_pos
         res['target_class_mask'] = target_class_mask
         res['tokens'] = tokens
+        res['word_vectors'] = word_vectors
+        res['n_words'] = n_words
         res['is_nr3d'] = is_nr3d
 
         if self.visualization:
